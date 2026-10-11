@@ -1,0 +1,6 @@
+{
+  "bracketSameLine": true,
+  "htmlWhitespaceSensitivity": "ignore",
+  "plugins": ["prettier-plugin-tailwindcss"],
+  "tailwindStylesheet": "./src/index.css"
+}
