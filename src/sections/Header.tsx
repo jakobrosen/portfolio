@@ -8,7 +8,7 @@ function Header() {
   const { t } = useLanguage();
 
   return (
-    <header className="px-6 pt-16 lg:sticky lg:top-0 lg:h-screen lg:w-2/5 lg:bg-surface lg:py-22 lg:pr-16 lg:pl-8">
+    <header className="px-4 pt-16 sm:px-6 lg:sticky lg:top-0 lg:h-screen lg:w-2/5 lg:bg-surface lg:py-22 lg:pr-16 lg:pl-8">
       <div className="mx-auto flex max-w-3xl flex-col lg:mr-0 lg:ml-auto lg:h-full lg:w-full lg:max-w-56">
         <div className="lg:flex lg:flex-1 lg:flex-col lg:items-end">
           <div className="lg:w-max">
