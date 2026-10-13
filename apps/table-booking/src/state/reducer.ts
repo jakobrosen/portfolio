@@ -1,4 +1,10 @@
+import { clamp, maxSeats } from "../lib/geometry";
 import type { AppState, Booking, Table } from "../types";
+
+// Keeps the chair count within what fits, e.g. after the table shrinks.
+function withValidSeats(table: Table): Table {
+  return { ...table, seats: clamp(table.seats, 1, maxSeats(table)) };
+}
 
 export type Action =
   | { type: "addTable"; table: Table }
@@ -16,13 +22,18 @@ export type Action =
 export function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case "addTable":
-      return { ...state, tables: [...state.tables, action.table] };
+      return {
+        ...state,
+        tables: [...state.tables, withValidSeats(action.table)],
+      };
 
     case "updateTable":
       return {
         ...state,
         tables: state.tables.map((table) =>
-          table.id === action.id ? { ...table, ...action.changes } : table,
+          table.id === action.id
+            ? withValidSeats({ ...table, ...action.changes })
+            : table,
         ),
       };
 

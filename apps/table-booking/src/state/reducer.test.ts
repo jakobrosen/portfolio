@@ -17,6 +17,15 @@ describe("reducer", () => {
     );
   });
 
+  it("drops chairs that no longer fit when a table shrinks", () => {
+    const next = reducer(state, {
+      type: "updateTable",
+      id: "t9",
+      changes: { width: 80 },
+    });
+    expect(next.tables.find((t) => t.id === "t9")?.seats).toBe(4);
+  });
+
   it("removes a table together with its bookings", () => {
     const next = reducer(state, { type: "removeTable", id: "t1" });
     expect(next.tables.some((t) => t.id === "t1")).toBe(false);
