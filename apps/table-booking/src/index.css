@@ -6,7 +6,7 @@
   --font-sans: "Roboto Variable", ui-sans-serif, system-ui, sans-serif;
 
   /* Palette from comminova.se. Surfaces, lightest to darkest. */
-  --color-background: #fbfaf9;
+  --color-background: #f2f2f2;
   --color-panel: #f7f5f3;
   --color-surface: #f1edea;
   --color-border: color-mix(in oklab, #18161d 10%, transparent);
@@ -42,6 +42,15 @@
   --color-accent-foreground: #54132b;
   --color-accent-subtle: color-mix(in oklab, #fff 18%, transparent);
   color: var(--color-foreground);
+}
+
+/* Scrollable without showing scrollbars, for areas panned by dragging. */
+@utility no-scrollbar {
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 @layer base {

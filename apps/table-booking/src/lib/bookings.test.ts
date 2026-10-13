@@ -5,7 +5,7 @@ import {
   atTime,
   bookingsFor,
   conflicts,
-  groupBookings,
+  groupByHour,
   minutesIntoDay,
   nextFreeStart,
   nextSlot,
@@ -146,18 +146,17 @@ describe("nextFreeStart", () => {
   });
 });
 
-describe("groupBookings", () => {
-  it("splits by now, upcoming and finished", () => {
-    const lunch = booking("lunch", "12:00");
-    const dinner = booking("dinner", "19:00");
-    const early = booking("early", "20:00", 90, {
-      seatedAt: time("19:40").toISOString(),
-    });
-    const late = booking("late", "21:00");
-    const groups = groupBookings([late, early, dinner, lunch], time("19:45"));
-    expect(groups.finished).toEqual([lunch]);
-    expect(groups.now).toEqual([dinner, early]);
-    expect(groups.upcoming).toEqual([late]);
+describe("groupByHour", () => {
+  it("groups by the starting hour, in order", () => {
+    const early = booking("early", "18:00");
+    const late = booking("late", "18:59");
+    const next = booking("next", "19:00");
+    const lunch = booking("lunch", "12:30");
+    expect(groupByHour([next, late, lunch, early])).toEqual([
+      { hour: 12, bookings: [lunch] },
+      { hour: 18, bookings: [early, late] },
+      { hour: 19, bookings: [next] },
+    ]);
   });
 });
 

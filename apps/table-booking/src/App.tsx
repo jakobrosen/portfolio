@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type ComponentProps } from "react";
 import { DndContext, DragOverlay, type Modifier } from "@dnd-kit/core";
 import { getEventCoordinates } from "@dnd-kit/utilities";
 import TopBar from "./components/TopBar";
@@ -10,6 +10,9 @@ import useAppState from "./state/useAppState";
 import useFloorDnd from "./hooks/useFloorDnd";
 import useNow from "./hooks/useNow";
 import useShortcuts from "./hooks/useShortcuts";
+import useZoom from "./hooks/useZoom";
+import { CHAIR_EXTENT } from "./lib/geometry";
+import { stepZoom } from "./lib/zoom";
 import { statusAt } from "./lib/bookings";
 import { presetTable } from "./lib/presets";
 import type { Mode } from "./types";
@@ -37,6 +40,27 @@ const centerOnPointer: Modifier = ({
   };
 };
 
+// A table drawn at the floor plan's zoom, for the copy that follows the
+// pointer while dragging.
+function ZoomedTable({
+  zoom,
+  ...props
+}: ComponentProps<typeof TableNode> & { zoom: number }) {
+  const { width, height } = props.table;
+  return (
+    <div
+      className="opacity-80"
+      style={{
+        width: (width + CHAIR_EXTENT * 2) * zoom,
+        height: (height + CHAIR_EXTENT * 2) * zoom,
+      }}>
+      <div className="origin-top-left" style={{ transform: `scale(${zoom})` }}>
+        <TableNode {...props} />
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const { state } = useAppState();
   const now = useNow();
@@ -49,10 +73,12 @@ function App() {
   const [creating, setCreating] = useState(false);
   // Opens on bookings, so there's a restaurant in service to look at.
   const [mode, setMode] = useState<Mode>("booking");
+  const [zoom, setZoom] = useZoom();
   // New tables are selected right away, ready to be sized and set up.
   const { active, target, contextProps } = useFloorDnd(
     contentRef,
     setSelectedId,
+    zoom,
   );
 
   function closeNewBooking() {
@@ -65,6 +91,8 @@ function App() {
     selected: state.tables.find((table) => table.id === selectedId),
     onSelect: setSelectedId,
     onNewBooking: () => setCreating(true),
+    onZoom: (direction) =>
+      setZoom(direction === 0 ? 1 : stepZoom(zoom, direction)),
     onEscape: () => {
       if (creating) closeNewBooking();
       else setSelectedId(undefined);
@@ -101,6 +129,8 @@ function App() {
             onSelect={setSelectedId}
             highlightedId={hoveredId}
             mode={mode}
+            zoom={zoom}
+            onZoomChange={setZoom}
           />
           {creating && (
             <NewBookingPanel
@@ -124,21 +154,19 @@ function App() {
         dropAnimation={null}
         modifiers={active?.kind === "preset" ? [centerOnPointer] : []}>
         {active?.kind === "preset" && (
-          <div className="opacity-80">
-            <TableNode
-              table={presetTable(active.preset)}
-              status="vacant"
-              showDetails={false}
-            />
-          </div>
+          <ZoomedTable
+            zoom={zoom}
+            table={presetTable(active.preset)}
+            status="vacant"
+            showDetails={false}
+          />
         )}
         {active?.kind === "table" && (
-          <div className="opacity-80">
-            <TableNode
-              table={active.table}
-              {...statusAt(active.table.id, state.bookings, time)}
-            />
-          </div>
+          <ZoomedTable
+            zoom={zoom}
+            table={active.table}
+            {...statusAt(active.table.id, state.bookings, time)}
+          />
         )}
       </DragOverlay>
     </DndContext>

@@ -9,6 +9,8 @@ type ShortcutOptions = {
   selected?: Table;
   onSelect: (id: string | undefined) => void;
   onNewBooking: () => void;
+  // 1 zooms in a step, -1 out, 0 back to 100%.
+  onZoom: (direction: 1 | -1 | 0) => void;
   // Closes whatever is open, or clears the selection.
   onEscape: () => void;
 };
@@ -29,6 +31,7 @@ function useShortcuts({
   selected,
   onSelect,
   onNewBooking,
+  onZoom,
   onEscape,
 }: ShortcutOptions) {
   const { state, dispatch } = useAppState();
@@ -53,6 +56,17 @@ function useShortcuts({
 
       if (key === "escape") {
         onEscape();
+        return;
+      }
+      const zoomKeys: Record<string, 1 | -1 | 0> = {
+        "+": 1,
+        "=": 1,
+        "-": -1,
+        "0": 0,
+      };
+      if (event.key in zoomKeys) {
+        event.preventDefault();
+        onZoom(zoomKeys[event.key]);
         return;
       }
       if (key === "n") {

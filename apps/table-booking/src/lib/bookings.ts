@@ -174,25 +174,16 @@ export function bookingState(booking: Booking, time: Date): BookingState {
   return startOf(booking) <= t ? "due" : "upcoming";
 }
 
-export type BookingGroups = {
-  // Seated, or within their booked time.
-  now: Booking[];
-  upcoming: Booking[];
-  finished: Booking[];
-};
-
-// Splits bookings by where they stand at the given time, each group in
-// start order.
-export function groupBookings(bookings: Booking[], time: Date): BookingGroups {
-  const groups: BookingGroups = { now: [], upcoming: [], finished: [] };
+// Bookings grouped by the hour they start in, earliest first and each group
+// in start order. 18:00 holds everything starting from 18:00 to 18:59.
+export function groupByHour(bookings: Booking[]) {
+  const groups = new Map<number, Booking[]>();
   const sorted = [...bookings].sort((a, b) => startOf(a) - startOf(b));
   for (const booking of sorted) {
-    const state = bookingState(booking, time);
-    if (state === "finished") groups.finished.push(booking);
-    else if (state === "upcoming") groups.upcoming.push(booking);
-    else groups.now.push(booking);
+    const hour = new Date(booking.start).getHours();
+    groups.set(hour, [...(groups.get(hour) ?? []), booking]);
   }
-  return groups;
+  return [...groups].map(([hour, inHour]) => ({ hour, bookings: inHour }));
 }
 
 export type Occupancy = {

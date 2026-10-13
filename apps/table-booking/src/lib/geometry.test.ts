@@ -169,7 +169,7 @@ describe("findFreeSpot", () => {
     const spot = findFreeSpot({ ...original, id: "copy" }, [original])!;
     expect(collides(spot, [original])).toBe(false);
     // Moving straight down is the shortest way out for a wide table.
-    expect(spot).toMatchObject({ x: 100, y: 240 });
+    expect(spot).toMatchObject({ x: 100, y: 220 });
   });
 
   it("doesn't overlap the original when given the original itself", () => {

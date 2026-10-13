@@ -1,11 +1,6 @@
 import { useState } from "react";
 import useAppState from "../state/useAppState";
-import {
-  bookingState,
-  groupBookings,
-  isSameDay,
-  type BookingGroups,
-} from "../lib/bookings";
+import { bookingState, groupByHour, isSameDay } from "../lib/bookings";
 import {
   formatDate,
   formatDuration,
@@ -22,13 +17,7 @@ type BookingListProps = {
   onHoverTable: (id: string | undefined) => void;
 };
 
-const sections: { key: keyof BookingGroups; title: string }[] = [
-  { key: "now", title: "Now" },
-  { key: "upcoming", title: "Upcoming" },
-  { key: "finished", title: "Finished" },
-];
-
-// The day's bookings in the sidebar, grouped by where they stand.
+// The day's bookings in the sidebar, under a heading for each hour.
 function BookingList({ time, onSelectTable, onHoverTable }: BookingListProps) {
   const { state } = useAppState();
   const [query, setQuery] = useState("");
@@ -43,7 +32,7 @@ function BookingList({ time, onSelectTable, onHoverTable }: BookingListProps) {
   const onDay = state.bookings.filter(
     (booking) => isSameDay(new Date(booking.start), time) && matches(booking),
   );
-  const groups = groupBookings(onDay, time);
+  const hours = groupByHour(onDay);
 
   return (
     <div className="flex flex-col gap-4">
@@ -64,21 +53,33 @@ function BookingList({ time, onSelectTable, onHoverTable }: BookingListProps) {
         </p>
       )}
 
-      {sections.map(({ key, title }) => {
-        const bookings = groups[key];
-        if (!bookings.length) return null;
+      {hours.map(({ hour, bookings }) => {
         const guests = bookings.reduce((sum, b) => sum + b.partySize, 0);
+        const current = hour === time.getHours();
         return (
-          <section key={key} className="flex flex-col gap-1">
-            <h3 className="flex justify-between px-1 text-xs font-medium tracking-wide text-muted uppercase">
-              <span>
-                {title} · {bookings.length}
+          <section key={hour} className="flex flex-col gap-1">
+            <h3
+              className={`flex items-center justify-between px-1 text-xs font-medium ${current ? "text-foreground" : "text-muted"}`}>
+              <span className="flex items-center gap-2">
+                <span className="tabular-nums">
+                  {String(hour).padStart(2, "0")}:00
+                </span>
+                {current && (
+                  <span className="rounded-full bg-accent-subtle px-1.5 py-px text-[10px] tracking-wide uppercase">
+                    Now
+                  </span>
+                )}
               </span>
-              <span className="normal-case">{formatGuests(guests)}</span>
+              <span>
+                {bookings.length}{" "}
+                {bookings.length === 1 ? "booking" : "bookings"} ·{" "}
+                {formatGuests(guests)}
+              </span>
             </h3>
             <ul className="flex flex-col">
               {bookings.map((booking) => {
-                const dot = bookingDots[bookingState(booking, time)];
+                const standing = bookingState(booking, time);
+                const dot = bookingDots[standing];
                 return (
                   <li key={booking.id}>
                     <button
@@ -88,7 +89,7 @@ function BookingList({ time, onSelectTable, onHoverTable }: BookingListProps) {
                       onMouseLeave={() => onHoverTable(undefined)}
                       onFocus={() => onHoverTable(booking.tableId)}
                       onBlur={() => onHoverTable(undefined)}
-                      className={`flex w-full items-center gap-3 rounded-md px-1 py-2 text-left outline-none hover:bg-surface focus-visible:ring-2 focus-visible:ring-accent ${key === "finished" ? "opacity-60" : ""}`}>
+                      className={`group flex w-full items-center gap-3 rounded-md px-1 py-2 text-left outline-none hover:bg-surface focus-visible:ring-2 focus-visible:ring-accent ${standing === "finished" ? "opacity-60" : ""}`}>
                       <span className="w-11 shrink-0 rounded-md bg-background py-1 text-center text-sm font-medium tabular-nums">
                         {formatTime(booking.start)}
                       </span>
@@ -97,11 +98,15 @@ function BookingList({ time, onSelectTable, onHoverTable }: BookingListProps) {
                           {booking.guestName}
                         </span>
                         <span className="block truncate text-xs text-muted">
-                          {formatGuests(booking.partySize)} ·{" "}
-                          {formatDuration(booking.durationMin)}
+                          {formatGuests(booking.partySize)}
+                          {/* The length is detail, shown on hover or focus. */}
+                          <span className="hidden group-hover:inline group-focus-visible:inline">
+                            {" "}
+                            · {formatDuration(booking.durationMin)}
+                          </span>
                         </span>
                       </span>
-                      <span className="flex shrink-0 items-center gap-1.5 rounded-md border border-border px-1.5 py-0.5 text-xs">
+                      <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted">
                         <span
                           title={dot.label}
                           className={`size-2 rounded-full ${dot.dot}`}

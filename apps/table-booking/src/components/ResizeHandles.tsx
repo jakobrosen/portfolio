@@ -7,6 +7,9 @@ type ResizeHandlesProps = {
   table: Table;
   onResize: (table: Table) => void;
   onResizeEnd: () => void;
+  // The floor plan's zoom. Pointer moves are divided by it, and handles are
+  // drawn bigger or smaller to keep the same size on screen.
+  zoom: number;
 };
 
 const HANDLE_SIZE = 12;
@@ -37,15 +40,21 @@ const cursors: Record<string, string> = {
 
 // Handle position relative to the box around the table and its chairs. On
 // round tables the corner handles sit on the edge of the circle.
-function handlePosition(table: Table, { x, y }: ResizeDirection) {
+function handlePosition(table: Table, { x, y }: ResizeDirection, size: number) {
   const reach = table.shape === "round" ? Math.SQRT1_2 : 1;
   return {
-    left: CHAIR_EXTENT + (table.width / 2) * (1 + x * reach) - HANDLE_SIZE / 2,
-    top: CHAIR_EXTENT + (table.height / 2) * (1 + y * reach) - HANDLE_SIZE / 2,
+    left: CHAIR_EXTENT + (table.width / 2) * (1 + x * reach) - size / 2,
+    top: CHAIR_EXTENT + (table.height / 2) * (1 + y * reach) - size / 2,
   };
 }
 
-function ResizeHandles({ table, onResize, onResizeEnd }: ResizeHandlesProps) {
+function ResizeHandles({
+  table,
+  onResize,
+  onResizeEnd,
+  zoom,
+}: ResizeHandlesProps) {
+  const size = HANDLE_SIZE / zoom;
   // The pointer and table when the resize started. Sizes are worked out from
   // these, so rounding to the grid doesn't add up over many moves.
   const start = useRef<{ x: number; y: number; table: Table } | null>(null);
@@ -62,8 +71,8 @@ function ResizeHandles({ table, onResize, onResizeEnd }: ResizeHandlesProps) {
     direction: ResizeDirection,
   ) {
     if (!start.current) return;
-    const dx = event.clientX - start.current.x;
-    const dy = event.clientY - start.current.y;
+    const dx = (event.clientX - start.current.x) / zoom;
+    const dy = (event.clientY - start.current.y) / zoom;
     onResize(resize(start.current.table, direction, dx, dy));
   }
 
@@ -85,9 +94,10 @@ function ResizeHandles({ table, onResize, onResizeEnd }: ResizeHandlesProps) {
       onPointerCancel={onPointerEnd}
       className={`absolute z-10 touch-none rounded-sm border-2 border-accent bg-table ${cursors[`${direction.x},${direction.y}`]}`}
       style={{
-        ...handlePosition(table, direction),
-        width: HANDLE_SIZE,
-        height: HANDLE_SIZE,
+        ...handlePosition(table, direction, size),
+        width: size,
+        height: size,
+        borderWidth: 2 / zoom,
       }}
     />
   ));

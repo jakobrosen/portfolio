@@ -14,6 +14,9 @@ type TableMenuProps = {
   // Edit mode shows the table's settings, booking mode its bookings.
   mode: Mode;
   onSelect: (id: string | undefined) => void;
+  // The floor plan's zoom. The menu itself isn't scaled, it sits outside the
+  // zoomed content and works out where the table is on screen.
+  zoom: number;
 };
 
 const MENU_WIDTH = 288;
@@ -25,7 +28,7 @@ const EDGE = 8;
 const ARROW_INSET = 18;
 
 // Above or below the table, and how far left and right the menu can go
-// while staying in view, in floor plan units.
+// while staying in view, in pixels of the zoomed floor plan.
 type Placement = {
   side: "above" | "below";
   minLeft: number;
@@ -34,7 +37,7 @@ type Placement = {
 
 // A menu above or below the selected table: its bookings in booking mode,
 // its settings in edit mode.
-function TableMenu({ table, time, mode, onSelect }: TableMenuProps) {
+function TableMenu({ table, time, mode, onSelect, zoom }: TableMenuProps) {
   const { state, dispatch } = useAppState();
   // The name before editing, put back if the field is left empty.
   const [savedLabel, setSavedLabel] = useState(table.label);
@@ -43,8 +46,10 @@ function TableMenu({ table, time, mode, onSelect }: TableMenuProps) {
   const [placement, setPlacement] = useState<Placement | null>(null);
   // For the resize observer, which outlives the render it was set up in.
   const tableRef = useRef(table);
+  const zoomRef = useRef(zoom);
   useEffect(() => {
     tableRef.current = table;
+    zoomRef.current = zoom;
   });
   // Set when the menu grows from something done in it, like opening the
   // booking form, so it's scrolled into view once it's been placed.
@@ -64,7 +69,8 @@ function TableMenu({ table, time, mode, onSelect }: TableMenuProps) {
       const view = floor.getBoundingClientRect();
       const origin = content.getBoundingClientRect();
       const height = menu.offsetHeight;
-      const tableTop = origin.top + tableRef.current.y - CHAIR_EXTENT;
+      const tableTop =
+        origin.top + (tableRef.current.y - CHAIR_EXTENT) * zoomRef.current;
       setPlacement({
         side: tableTop - GAP - height >= view.top ? "above" : "below",
         minLeft: view.left - origin.left + EDGE,
@@ -92,7 +98,7 @@ function TableMenu({ table, time, mode, onSelect }: TableMenuProps) {
 
   const bookingCount = bookingsFor(state.bookings, table.id, time).length;
   const side = placement?.side ?? "above";
-  const centerX = table.x + table.width / 2;
+  const centerX = (table.x + table.width / 2) * zoom;
   const left = placement
     ? Math.max(
         placement.minLeft,
@@ -120,8 +126,8 @@ function TableMenu({ table, time, mode, onSelect }: TableMenuProps) {
         left,
         top:
           side === "above"
-            ? table.y - CHAIR_EXTENT - GAP
-            : table.y + table.height + CHAIR_EXTENT + GAP,
+            ? (table.y - CHAIR_EXTENT) * zoom - GAP
+            : (table.y + table.height + CHAIR_EXTENT) * zoom + GAP,
         width: MENU_WIDTH,
       }}>
       {/* Arrow pointing at the table. */}

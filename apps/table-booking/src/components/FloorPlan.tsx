@@ -9,6 +9,8 @@ import TableNode from "./TableNode";
 import ResizeHandles from "./ResizeHandles";
 import TableMenu from "./TableMenu";
 import useFloorPan from "../hooks/useFloorPan";
+import useFloorZoom from "../hooks/useFloorZoom";
+import ZoomControls from "./ZoomControls";
 
 // Space kept free past the furthest table, so there's room to keep building.
 const PADDING = 200;
@@ -26,6 +28,8 @@ type FloorPlanProps = {
   highlightedId?: string;
   // Tables can only be moved and resized in edit mode.
   mode: Mode;
+  zoom: number;
+  onZoomChange: (zoom: number) => void;
 };
 
 type PlacedTableProps = {
@@ -41,6 +45,7 @@ type PlacedTableProps = {
   onSelect: () => void;
   onResize: (table: Table) => void;
   onResizeEnd: () => void;
+  zoom: number;
 };
 
 function PlacedTable({
@@ -55,6 +60,7 @@ function PlacedTable({
   onSelect,
   onResize,
   onResizeEnd,
+  zoom,
 }: PlacedTableProps) {
   const data: DragData = { kind: "table", table };
   const { setNodeRef, attributes, listeners } = useDraggable({
@@ -123,6 +129,7 @@ function PlacedTable({
               table={table}
               onResize={onResize}
               onResizeEnd={onResizeEnd}
+              zoom={zoom}
             />
           )}
         </>
@@ -131,14 +138,23 @@ function PlacedTable({
   );
 }
 
-// Shown above a table while it's resized, so it's clear how many fit.
-function SeatBadge({ table, blocked }: { table: Table; blocked: boolean }) {
+// Shown above a table while it's resized, so it's clear how many fit. It
+// sits outside the zoomed content, so it keeps its size.
+function SeatBadge({
+  table,
+  blocked,
+  zoom,
+}: {
+  table: Table;
+  blocked: boolean;
+  zoom: number;
+}) {
   return (
     <div
       className={`pointer-events-none absolute z-20 -translate-x-1/2 rounded-full px-2.5 py-1 text-xs whitespace-nowrap ${blocked ? "bg-conflict text-white" : "bg-foreground text-background"}`}
       style={{
-        left: table.x + table.width / 2,
-        top: table.y - CHAIR_EXTENT - 32,
+        left: (table.x + table.width / 2) * zoom,
+        top: (table.y - CHAIR_EXTENT) * zoom - 32,
       }}>
       {blocked ? "Too close to another table" : `Fits ${maxSeats(table)} seats`}
     </div>
@@ -170,11 +186,19 @@ function FloorPlan({
   onSelect,
   highlightedId,
   mode,
+  zoom,
+  onZoomChange,
 }: FloorPlanProps) {
   const { state, dispatch } = useAppState();
   const { setNodeRef } = useDroppable({ id: FLOOR_ID });
   const { floorRef, panning, spaceHeld, onPointerDownCapture } =
     useFloorPan(mode);
+  const {
+    floorRef: zoomFloorRef,
+    view,
+    zoomTo,
+    fit,
+  } = useFloorZoom(zoom, onZoomChange);
   // The table being resized, shown in place of the saved one until released.
   const [resizing, setResizing] = useState<Table | null>(null);
   const resizeValid = resizing ? !collides(resizing, state.tables) : true;
@@ -204,66 +228,96 @@ function FloorPlan({
     Math.max(0, ...tables.map((table) => edge(table) + CHAIR_EXTENT + PADDING));
   const contentWidth = furthest((table) => table.x + table.width);
   const contentHeight = furthest((table) => table.y + table.height);
+  // The content fills the view at any zoom, so the grid and empty floor
+  // reach its edges.
+  const width = Math.max(contentWidth, view.width / zoom);
+  const height = Math.max(contentHeight, view.height / zoom);
+
+  function fitTables() {
+    const extent = (edge: (table: Table) => number) =>
+      Math.max(0, ...tables.map((table) => edge(table) + CHAIR_EXTENT));
+    fit({
+      width: extent((table) => table.x + table.width),
+      height: extent((table) => table.y + table.height),
+    });
+  }
 
   return (
-    <main
-      ref={(node) => {
-        setNodeRef(node);
-        floorRef.current = node;
-      }}
-      onPointerDownCapture={onPointerDownCapture}
-      onClick={(event) => {
-        // Clicking empty floor clears the selection.
-        if (
-          event.target === event.currentTarget ||
-          event.target === contentRef.current
-        ) {
-          onSelect(undefined);
-        }
-      }}
-      // The grid is only there to line tables up, so bookings go without it.
-      // A hand shows the floor can be dragged, everywhere while space is held.
-      className={`relative h-full overflow-auto select-none ${panning ? "cursor-grabbing **:cursor-grabbing!" : spaceHeld ? "cursor-grab **:cursor-grab!" : "cursor-grab"} ${mode === "edit" ? "bg-[radial-gradient(var(--color-grid-dot)_1px,transparent_1px)] bg-size-[20px_20px] bg-local bg-position-[-10px_-10px]" : ""}`}>
-      {tables.length === 0 && (
-        <p className="pointer-events-none absolute inset-0 grid place-items-center text-sm text-muted">
-          {mode === "edit"
-            ? "Drag tables in from the sidebar"
-            : "No tables yet. Switch to Edit layout to add some."}
-        </p>
-      )}
-      <div
-        ref={contentRef}
-        className="relative min-h-full min-w-full"
-        style={{ width: contentWidth, height: contentHeight }}>
-        {dropTarget && <DropOutline target={dropTarget} />}
-        {tables.map((table) => (
-          <PlacedTable
-            key={table.id}
-            table={table}
-            bookings={bookings}
-            time={time}
-            moving={table.id === movingId}
-            selected={table.id === selectedId}
-            highlighted={table.id === highlightedId}
-            editable={mode === "edit"}
-            blocked={table.id === resizing?.id && !resizeValid}
-            onSelect={() => onSelect(table.id)}
-            onResize={setResizing}
-            onResizeEnd={finishResize}
-          />
-        ))}
-        {resizing && <SeatBadge table={resizing} blocked={!resizeValid} />}
-        {showMenu && (
-          <TableMenu
-            key={selected.id}
-            table={selected}
-            time={time}
-            mode={mode}
-            onSelect={onSelect}
-          />
+    <>
+      <main
+        ref={(node) => {
+          setNodeRef(node);
+          floorRef.current = node;
+          zoomFloorRef.current = node;
+        }}
+        data-floor-surface
+        onPointerDownCapture={onPointerDownCapture}
+        onClick={(event) => {
+          // Clicking empty floor clears the selection.
+          if ((event.target as Element).hasAttribute("data-floor-surface")) {
+            onSelect(undefined);
+          }
+        }}
+        // A hand shows the floor can be dragged, everywhere while space is held.
+        className={`relative no-scrollbar h-full overflow-auto select-none ${panning ? "cursor-grabbing **:cursor-grabbing!" : spaceHeld ? "cursor-grab **:cursor-grab!" : "cursor-grab"}`}>
+        {tables.length === 0 && (
+          <p className="pointer-events-none absolute inset-0 grid place-items-center text-sm text-muted">
+            {mode === "edit"
+              ? "Drag tables in from the sidebar"
+              : "No tables yet. Switch to Edit layout to add some."}
+          </p>
         )}
-      </div>
-    </main>
+        {/* Takes up the zoomed size, so scrolling covers all of it. */}
+        <div
+          data-floor-surface
+          className="relative"
+          style={{ width: width * zoom, height: height * zoom }}>
+          {/* The grid is only there to line tables up, so bookings go without it. */}
+          <div
+            ref={contentRef}
+            data-floor-surface
+            className={`absolute top-0 left-0 origin-top-left ${mode === "edit" ? "bg-[radial-gradient(var(--color-grid-dot)_1px,transparent_1px)] bg-size-[20px_20px] bg-position-[-10px_-10px]" : ""}`}
+            style={{ width, height, transform: `scale(${zoom})` }}>
+            {dropTarget && <DropOutline target={dropTarget} />}
+            {tables.map((table) => (
+              <PlacedTable
+                key={table.id}
+                table={table}
+                bookings={bookings}
+                time={time}
+                moving={table.id === movingId}
+                selected={table.id === selectedId}
+                highlighted={table.id === highlightedId}
+                editable={mode === "edit"}
+                blocked={table.id === resizing?.id && !resizeValid}
+                onSelect={() => onSelect(table.id)}
+                onResize={setResizing}
+                onResizeEnd={finishResize}
+                zoom={zoom}
+              />
+            ))}
+          </div>
+          {resizing && (
+            <SeatBadge table={resizing} blocked={!resizeValid} zoom={zoom} />
+          )}
+          {showMenu && (
+            <TableMenu
+              key={selected.id}
+              table={selected}
+              time={time}
+              mode={mode}
+              onSelect={onSelect}
+              zoom={zoom}
+            />
+          )}
+        </div>
+      </main>
+      <ZoomControls
+        zoom={zoom}
+        onZoom={(next) => zoomTo(next)}
+        onFit={fitTables}
+      />
+    </>
   );
 }
 

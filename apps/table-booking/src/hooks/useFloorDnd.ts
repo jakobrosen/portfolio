@@ -25,11 +25,12 @@ export type DropTarget = { table: Table; valid: boolean };
 type Point = { x: number; y: number };
 
 // Drag and drop for the floor plan: new tables from the palette, and moving
-// tables already placed. `contentRef` is the floor plan's scrolling content,
-// used to turn screen positions into floor plan positions.
+// tables already placed. `contentRef` is the floor plan's scaled content,
+// used with `zoom` to turn screen positions into floor plan positions.
 function useFloorDnd(
   contentRef: RefObject<HTMLDivElement | null>,
   onTableAdded: (id: string) => void,
+  zoom: number,
 ) {
   const { state, dispatch } = useAppState();
   const [active, setActive] = useState<DragData | null>(null);
@@ -53,8 +54,8 @@ function useFloorDnd(
     if (event.over?.id !== FLOOR_ID) return null;
 
     const base = data.kind === "table" ? data.table : presetTable(data.preset);
-    const x = pointer.current.x - content.left - grab.current.x;
-    const y = pointer.current.y - content.top - grab.current.y;
+    const x = (pointer.current.x - content.left) / zoom - grab.current.x;
+    const y = (pointer.current.y - content.top) / zoom - grab.current.y;
     const table = {
       ...base,
       x: Math.max(FLOOR_MARGIN, snap(x)),
@@ -83,8 +84,8 @@ function useFloorDnd(
     grab.current =
       data.kind === "table"
         ? {
-            x: start.x - content.left - data.table.x,
-            y: start.y - content.top - data.table.y,
+            x: (start.x - content.left) / zoom - data.table.x,
+            y: (start.y - content.top) / zoom - data.table.y,
           }
         : { x: data.preset.width / 2, y: data.preset.height / 2 };
 

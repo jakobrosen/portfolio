@@ -12,9 +12,11 @@ export const FLOOR_MARGIN = 40;
 export const SEAT_PITCH = 60;
 export const CHAIR_WIDTH = 36;
 export const CHAIR_DEPTH = 20;
-export const CHAIR_GAP = 6;
+// How far chairs are pushed in under the table. The table is drawn on top,
+// so only the backrest and the front of the seat show.
+export const CHAIR_TUCK = 8;
 // How far chairs stick out from the table edge.
-export const CHAIR_EXTENT = CHAIR_GAP + CHAIR_DEPTH;
+export const CHAIR_EXTENT = CHAIR_DEPTH - CHAIR_TUCK;
 
 type Side = "top" | "right" | "bottom" | "left";
 
@@ -60,7 +62,7 @@ export function chairPositions(table: Table, seats = table.seats): Chair[] {
   const { width, height } = table;
 
   if (table.shape === "round") {
-    const radius = width / 2 + CHAIR_GAP + CHAIR_DEPTH / 2;
+    const radius = width / 2 + CHAIR_EXTENT - CHAIR_DEPTH / 2;
     return Array.from({ length: count }, (_, i) => {
       const angle = (360 / count) * i;
       const radians = ((angle - 90) * Math.PI) / 180;
@@ -88,7 +90,7 @@ export function chairPositions(table: Table, seats = table.seats): Chair[] {
     }
   }
 
-  const offset = CHAIR_GAP + CHAIR_DEPTH / 2;
+  const offset = CHAIR_EXTENT - CHAIR_DEPTH / 2;
   const spread = (n: number, length: number) =>
     Array.from({ length: n }, (_, i) => (length * (i + 0.5)) / n);
 

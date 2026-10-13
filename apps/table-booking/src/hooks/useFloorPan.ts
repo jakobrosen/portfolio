@@ -52,7 +52,7 @@ function useFloorPan(mode: Mode) {
     const middle = event.button === 1;
     if (event.button !== 0 && !middle) return;
     const forced = spaceHeld || middle;
-    const onEmptyFloor = target === floor || target.parentElement === floor;
+    const onEmptyFloor = target.hasAttribute("data-floor-surface");
     if (!forced && mode === "edit" && !onEmptyFloor) return;
     if (forced) {
       event.stopPropagation();
