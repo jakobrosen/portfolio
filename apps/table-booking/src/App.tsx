@@ -5,11 +5,13 @@ import TopBar from "./components/TopBar";
 import Sidebar from "./components/Sidebar";
 import FloorPlan from "./components/FloorPlan";
 import TableNode from "./components/TableNode";
+import NewBookingPanel from "./components/NewBookingPanel";
 import useAppState from "./state/useAppState";
 import useFloorDnd from "./hooks/useFloorDnd";
 import useNow from "./hooks/useNow";
 import { statusAt } from "./lib/bookings";
 import { presetTable } from "./lib/presets";
+import type { Mode } from "./types";
 
 // Keeps a new table centred on the pointer, matching where it will be dropped.
 const centerOnPointer: Modifier = ({
@@ -39,7 +41,14 @@ function App() {
   const now = useNow();
   const contentRef = useRef<HTMLDivElement>(null);
   const [selectedId, setSelectedId] = useState<string>();
-  // New tables are selected right away, ready to be resized.
+  const [hoveredId, setHoveredId] = useState<string>();
+  // A moment picked in the top bar, or null to follow the clock.
+  const [viewed, setViewed] = useState<Date | null>(null);
+  const time = viewed ?? now;
+  const [creating, setCreating] = useState(false);
+  // Opens on bookings, so there's a restaurant in service to look at.
+  const [mode, setMode] = useState<Mode>("booking");
+  // New tables are selected right away, ready to be sized and set up.
   const { active, target, contextProps } = useFloorDnd(
     contentRef,
     setSelectedId,
@@ -48,16 +57,47 @@ function App() {
   return (
     <DndContext {...contextProps}>
       <div className="grid h-full grid-cols-[18rem_1fr] grid-rows-[auto_1fr]">
-        <Sidebar />
-        <TopBar />
-        <FloorPlan
-          contentRef={contentRef}
-          time={now}
-          movingId={active?.kind === "table" ? active.table.id : undefined}
-          dropTarget={target}
-          selectedId={selectedId}
-          onSelect={setSelectedId}
+        <Sidebar
+          mode={mode}
+          onModeChange={setMode}
+          time={time}
+          onSelectTable={setSelectedId}
+          onHoverTable={setHoveredId}
         />
+        <TopBar
+          time={time}
+          live={viewed === null}
+          now={now}
+          onTimeChange={setViewed}
+          onNewBooking={() => setCreating(true)}
+        />
+        <div className="relative min-h-0 min-w-0">
+          <FloorPlan
+            contentRef={contentRef}
+            time={time}
+            movingId={active?.kind === "table" ? active.table.id : undefined}
+            dropTarget={target}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            highlightedId={hoveredId}
+            mode={mode}
+          />
+          {creating && (
+            <NewBookingPanel
+              time={time}
+              onHighlight={setHoveredId}
+              onDone={(saved) => {
+                setCreating(false);
+                setHoveredId(undefined);
+                // Show the new booking on its table.
+                if (saved) {
+                  setMode("booking");
+                  setSelectedId(saved.tableId);
+                }
+              }}
+            />
+          )}
+        </div>
       </div>
 
       {/* No drop animation, the table is already where it was dropped. */}
@@ -77,7 +117,7 @@ function App() {
           <div className="opacity-80">
             <TableNode
               table={active.table}
-              {...statusAt(active.table.id, state.bookings, now)}
+              {...statusAt(active.table.id, state.bookings, time)}
             />
           </div>
         )}

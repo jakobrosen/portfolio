@@ -11,7 +11,6 @@ import {
   findFreeSpot,
   maxSeats,
   overlaps,
-  placeMenu,
   resize,
   snap,
 } from "./geometry";
@@ -182,48 +181,5 @@ describe("findFreeSpot", () => {
     const below: Table = { ...original, id: "b", y: 240 };
     const spot = findFreeSpot({ ...original, id: "copy" }, [original, below])!;
     expect(collides(spot, [original, below])).toBe(false);
-  });
-});
-
-describe("placeMenu", () => {
-  const size = { width: 200, height: 100 };
-  const table: Table = { ...rect(120, 80), id: "t", x: 400, y: 400 };
-  const at = (id: string, x: number, y: number): Table => ({
-    ...rect(120, 80),
-    id,
-    x,
-    y,
-  });
-
-  it("prefers the right side when it's free", () => {
-    expect(placeMenu(table, [table], size)).toMatchObject({
-      side: "right",
-      x: 400 + 120 + CHAIR_EXTENT + 12,
-    });
-  });
-
-  it("moves to a free side when a neighbour is in the way", () => {
-    const right = at("r", 600, 400);
-    expect(placeMenu(table, [table, right], size).side).toBe("left");
-    const left = at("l", 200, 400);
-    expect(placeMenu(table, [table, right, left], size).side).toBe("below");
-  });
-
-  it("slides along a side to get past a neighbour", () => {
-    // A table just below the right-hand spot, but clear of it further up.
-    const belowRight = at("br", 560, 500);
-    const spot = placeMenu(table, [table, belowRight], size);
-    expect(spot.side).toBe("right");
-    expect(spot.y).toBeLessThan(440 - size.height / 2);
-    // The arrow can still reach the table's centre.
-    expect(spot.y + size.height).toBeGreaterThan(400 + 40);
-  });
-
-  it("stays on the floor plan", () => {
-    const corner: Table = { ...table, x: 40, y: 40 };
-    const right = at("r", 240, 40);
-    const spot = placeMenu(corner, [corner, right], size);
-    expect(spot.side).toBe("below");
-    expect(spot.x).toBeGreaterThanOrEqual(0);
   });
 });

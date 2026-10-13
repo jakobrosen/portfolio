@@ -1,245 +1,179 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import useAppState from "../state/useAppState";
-import {
-  clamp,
-  collides,
-  findFreeSpot,
-  maxSeats,
-  MAX_TABLE_SIZE,
-  MENU_ARROW_INSET,
-  MIN_TABLE_SIZE,
-  placeMenu,
-  snap,
-  type MenuSide,
-} from "../lib/geometry";
-import { nextLabel } from "../lib/presets";
-import type { Table, TableShape } from "../types";
+import { bookingsFor } from "../lib/bookings";
+import { CHAIR_EXTENT, clamp } from "../lib/geometry";
+import type { Mode, Table } from "../types";
 import IconButton from "./IconButton";
-import {
-  CloseIcon,
-  DeleteIcon,
-  DuplicateIcon,
-  RectIcon,
-  RoundIcon,
-} from "./icons";
+import { CloseIcon } from "./icons";
+import TableBookings from "./TableBookings";
+import TableSettings from "./TableSettings";
 
 type TableMenuProps = {
   table: Table;
+  time: Date;
+  // Edit mode shows the table's settings, booking mode its bookings.
+  mode: Mode;
   onSelect: (id: string | undefined) => void;
 };
 
 const MENU_WIDTH = 288;
-// Height of the menu with its controls, used to pick a side with room.
-const MENU_HEIGHT = 136;
+// Gap between the menu and the table's chairs.
+const GAP = 12;
+// Closest the menu gets to the sides of the visible floor plan.
+const EDGE = 8;
+// How far in from the menu's corners the arrow has to stay.
+const ARROW_INSET = 18;
 
-// The arrow sits on the edge facing the table.
-const arrowStyles: Record<MenuSide, string> = {
-  right: "-left-1.5 border-b border-l",
-  left: "-right-1.5 border-t border-r",
-  below: "-top-1.5 border-t border-l",
-  above: "-bottom-1.5 border-r border-b",
+// Above or below the table, and how far left and right the menu can go
+// while staying in view, in floor plan units.
+type Placement = {
+  side: "above" | "below";
+  minLeft: number;
+  maxLeft: number;
 };
 
-const shapes = [
-  { shape: "rect", label: "Rectangle", icon: <RectIcon /> },
-  { shape: "round", label: "Round", icon: <RoundIcon /> },
-] satisfies { shape: TableShape; label: string; icon: ReactNode }[];
-
-// Round tables need equal sides, so a rectangle becomes a circle of about
-// the same size. A circle becomes a square.
-function withShape(table: Table, shape: TableShape): Table {
-  const size =
-    shape === "round"
-      ? clamp(
-          snap((table.width + table.height) / 2),
-          MIN_TABLE_SIZE,
-          MAX_TABLE_SIZE,
-        )
-      : table.width;
-  return { ...table, shape, width: size, height: size };
-}
-
-// A small menu next to the selected table, for its name, shape and chairs.
-function TableMenu({ table, onSelect }: TableMenuProps) {
+// A menu above or below the selected table: its bookings in booking mode,
+// its settings in edit mode.
+function TableMenu({ table, time, mode, onSelect }: TableMenuProps) {
   const { state, dispatch } = useAppState();
-  const [shapeError, setShapeError] = useState("");
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
   // The name before editing, put back if the field is left empty.
   const [savedLabel, setSavedLabel] = useState(table.label);
-
-  const max = maxSeats(table);
-  const bookingCount = state.bookings.filter(
-    (booking) => booking.tableId === table.id,
-  ).length;
-
-  const { side, x, y } = placeMenu(table, state.tables, {
-    width: MENU_WIDTH,
-    height: MENU_HEIGHT,
+  const menuRef = useRef<HTMLDivElement>(null);
+  // Null until the menu has been measured, it stays hidden until then.
+  const [placement, setPlacement] = useState<Placement | null>(null);
+  // For the resize observer, which outlives the render it was set up in.
+  const tableRef = useRef(table);
+  useEffect(() => {
+    tableRef.current = table;
   });
-  const sideways = side === "left" || side === "right";
+  // Set when the menu grows from something done in it, like opening the
+  // booking form, so it's scrolled into view once it's been placed.
+  const grew = useRef(false);
+
+  // Goes above the table when there's room for it in the visible part of
+  // the floor plan, otherwise below. Checked again when the menu changes
+  // size, such as when the booking form opens.
+  useEffect(() => {
+    const menu = menuRef.current;
+    const floor = menu?.closest("main");
+    const content = menu?.offsetParent;
+    if (!menu || !floor || !(content instanceof HTMLElement)) return;
+
+    let previousHeight = 0;
+    const observer = new ResizeObserver(() => {
+      const view = floor.getBoundingClientRect();
+      const origin = content.getBoundingClientRect();
+      const height = menu.offsetHeight;
+      const tableTop = origin.top + tableRef.current.y - CHAIR_EXTENT;
+      setPlacement({
+        side: tableTop - GAP - height >= view.top ? "above" : "below",
+        minLeft: view.left - origin.left + EDGE,
+        maxLeft: view.right - origin.left - EDGE - MENU_WIDTH,
+      });
+
+      // Not when it first opens, as moving the floor plan right after a
+      // click is jarring.
+      if (previousHeight && height > previousHeight) grew.current = true;
+      previousHeight = height;
+    });
+    observer.observe(menu);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!grew.current) return;
+    grew.current = false;
+    menuRef.current?.scrollIntoView({
+      block: "nearest",
+      inline: "nearest",
+      behavior: "smooth",
+    });
+  }, [placement]);
+
+  const bookingCount = bookingsFor(state.bookings, table.id, time).length;
+  const side = placement?.side ?? "above";
+  const centerX = table.x + table.width / 2;
+  const left = placement
+    ? Math.max(
+        placement.minLeft,
+        Math.min(centerX - MENU_WIDTH / 2, placement.maxLeft),
+      )
+    : centerX - MENU_WIDTH / 2;
   // Where the arrow meets the edge, lined up with the table's centre.
-  const arrowOffset = sideways
-    ? clamp(
-        table.y + table.height / 2 - y,
-        MENU_ARROW_INSET,
-        MENU_HEIGHT - MENU_ARROW_INSET,
-      ) - 6
-    : clamp(
-        table.x + table.width / 2 - x,
-        MENU_ARROW_INSET,
-        MENU_WIDTH - MENU_ARROW_INSET,
-      ) - 6;
+  const arrowLeft =
+    clamp(centerX - left, ARROW_INSET, MENU_WIDTH - ARROW_INSET) - 6;
 
-  const update = (changes: Partial<Omit<Table, "id">>) =>
-    dispatch({ type: "updateTable", id: table.id, changes });
   const close = () => onSelect(undefined);
-
-  function changeShape(shape: TableShape) {
-    if (shape === table.shape) return;
-    const changed = withShape(table, shape);
-    if (collides(changed, state.tables)) {
-      setShapeError("Not enough room here. Move the table and try again.");
-      return;
-    }
-    setShapeError("");
-    update(changed);
-  }
-
-  function duplicate() {
-    const spot = findFreeSpot(table, state.tables);
-    if (!spot) return;
-    const copy = {
-      ...spot,
-      id: crypto.randomUUID(),
-      label: nextLabel(state.tables),
-    };
-    dispatch({ type: "addTable", table: copy });
-    onSelect(copy.id);
-  }
-
-  function remove() {
-    dispatch({ type: "removeTable", id: table.id });
-    close();
-  }
 
   return (
     <div
+      ref={menuRef}
       role="dialog"
       aria-label={`Table ${table.label}`}
       onKeyDown={(event) => {
         if (event.key === "Escape") close();
       }}
       // Menus above the table hang from their bottom edge, so they stay next
-      // to the table when the delete confirmation makes them shorter.
-      className={`absolute z-30 flex flex-col gap-3 rounded-xl border border-border bg-panel p-3 shadow-lg ${side === "above" ? "-translate-y-full" : ""}`}
+      // to the table while their height changes.
+      className={`absolute z-30 flex flex-col gap-3 rounded-xl border border-border bg-panel p-3 shadow-lg ${side === "above" ? "-translate-y-full" : ""} ${placement ? "" : "invisible"}`}
       style={{
-        left: x,
-        top: side === "above" ? y + MENU_HEIGHT : y,
+        left,
+        top:
+          side === "above"
+            ? table.y - CHAIR_EXTENT - GAP
+            : table.y + table.height + CHAIR_EXTENT + GAP,
         width: MENU_WIDTH,
       }}>
       {/* Arrow pointing at the table. */}
       <span
         aria-hidden
-        className={`absolute size-3 rotate-45 border-border bg-panel ${arrowStyles[side]}`}
-        style={sideways ? { top: arrowOffset } : { left: arrowOffset }}
+        className={`absolute size-3 rotate-45 border-border bg-panel ${side === "above" ? "-bottom-1.5 border-r border-b" : "-top-1.5 border-t border-l"}`}
+        style={{ left: arrowLeft }}
       />
 
-      {confirmingDelete ? (
-        <div role="alert" className="flex flex-col gap-3 text-sm">
-          <p>
-            Delete table {table.label}
-            {bookingCount > 0 &&
-              ` and its ${bookingCount} ${bookingCount === 1 ? "booking" : "bookings"}`}
-            ?
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              autoFocus
-              onClick={() => setConfirmingDelete(false)}
-              className="rounded-md border border-border bg-background py-1.5">
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={remove}
-              className="rounded-md bg-conflict py-1.5 font-medium text-white">
-              Delete
-            </button>
-          </div>
-        </div>
-      ) : (
-        <>
-          <div className="flex items-center gap-1">
-            <input
-              aria-label="Table name"
-              value={table.label}
-              onFocus={() => setSavedLabel(table.label)}
-              onChange={(event) => update({ label: event.target.value })}
-              onBlur={() => {
-                if (!table.label.trim()) update({ label: savedLabel });
-              }}
-              className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1 font-medium outline-none hover:border-border focus:border-accent focus:bg-background"
-            />
-            <IconButton label="Close" onClick={close}>
-              <CloseIcon />
-            </IconButton>
-          </div>
-
-          <div className="flex items-center gap-1">
-            <div
-              role="group"
-              aria-label="Shape"
-              className="mr-auto flex rounded-lg border border-border bg-background p-0.5">
-              {shapes.map(({ shape, label, icon }) => (
-                <button
-                  key={shape}
-                  type="button"
-                  aria-pressed={table.shape === shape}
-                  onClick={() => changeShape(shape)}
-                  className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-xs outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                    table.shape === shape
-                      ? "bg-accent-subtle text-accent"
-                      : "text-muted hover:text-foreground"
-                  }`}>
-                  {icon}
-                  {label}
-                </button>
-              ))}
-            </div>
-            <IconButton label="Duplicate table" onClick={duplicate}>
-              <DuplicateIcon />
-            </IconButton>
-            <IconButton
-              label="Delete table"
-              tone="danger"
-              onClick={() => setConfirmingDelete(true)}>
-              <DeleteIcon />
-            </IconButton>
-          </div>
-
-          <label className="flex items-center gap-3 px-2 text-sm">
-            <span>Chairs</span>
-            <input
-              type="range"
-              min={1}
-              max={max}
-              value={table.seats}
-              onChange={(event) =>
-                update({ seats: Number(event.target.value) })
-              }
-              className="min-w-0 flex-1 accent-accent"
-            />
-            <span className="text-muted tabular-nums">
-              {table.seats}/{max}
+      <div className="flex items-center gap-1">
+        {mode === "booking" ? (
+          <h2 className="min-w-0 flex-1 truncate px-2 py-1">
+            <span className="font-medium">{table.label}</span>
+            <span className="ml-2 text-sm text-muted">
+              {bookingCount
+                ? `${bookingCount} ${bookingCount === 1 ? "booking" : "bookings"}`
+                : "No bookings"}
             </span>
-          </label>
-          {shapeError && (
-            <p role="alert" className="-mt-1 px-2 text-xs text-conflict">
-              {shapeError}
-            </p>
-          )}
-        </>
+          </h2>
+        ) : (
+          <input
+            aria-label="Table name"
+            value={table.label}
+            onFocus={() => setSavedLabel(table.label)}
+            onChange={(event) =>
+              dispatch({
+                type: "updateTable",
+                id: table.id,
+                changes: { label: event.target.value },
+              })
+            }
+            onBlur={() => {
+              if (!table.label.trim()) {
+                dispatch({
+                  type: "updateTable",
+                  id: table.id,
+                  changes: { label: savedLabel },
+                });
+              }
+            }}
+            className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1 font-medium outline-none hover:border-border focus:border-accent focus:bg-background"
+          />
+        )}
+        <IconButton label="Close" onClick={close}>
+          <CloseIcon />
+        </IconButton>
+      </div>
+
+      {mode === "booking" ? (
+        <TableBookings table={table} time={time} />
+      ) : (
+        <TableSettings table={table} onSelect={onSelect} />
       )}
     </div>
   );

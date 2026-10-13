@@ -1,6 +1,19 @@
 import { describe, expect, it } from "vitest";
 import type { Booking, Table } from "../types";
-import { bookingsFor, conflicts, statusAt, suggestTables } from "./bookings";
+import {
+  addDays,
+  atTime,
+  bookingsFor,
+  conflicts,
+  groupBookings,
+  minutesIntoDay,
+  nextFreeStart,
+  nextSlot,
+  startOfDay,
+  statusAt,
+  suggestTables,
+} from "./bookings";
+import { formatTime } from "./format";
 
 const time = (hhmm: string, day = "2026-10-13") =>
   new Date(`${day}T${hhmm}:00`);
@@ -107,5 +120,61 @@ describe("suggestTables", () => {
       durationMin: 90,
     });
     expect(result.map((t) => t.id)).toEqual(["t4", "t8"]);
+  });
+});
+
+describe("nextSlot", () => {
+  it("rounds up to the next quarter hour", () => {
+    expect(formatTime(nextSlot(time("18:01")))).toBe("18:15");
+    expect(formatTime(nextSlot(time("18:15")))).toBe("18:15");
+    expect(formatTime(nextSlot(new Date(time("18:15").getTime() + 1000)))).toBe(
+      "18:30",
+    );
+  });
+});
+
+describe("nextFreeStart", () => {
+  it("skips past bookings that are in the way", () => {
+    const dinner = booking("dinner", "19:00", 120);
+    expect(formatTime(nextFreeStart("t1", [dinner], time("18:00"), 90))).toBe(
+      "21:00",
+    );
+    expect(formatTime(nextFreeStart("t1", [dinner], time("17:00"), 90))).toBe(
+      "17:00",
+    );
+  });
+});
+
+describe("groupBookings", () => {
+  it("splits by now, upcoming and finished", () => {
+    const lunch = booking("lunch", "12:00");
+    const dinner = booking("dinner", "19:00");
+    const early = booking("early", "20:00", 90, {
+      seatedAt: time("19:40").toISOString(),
+    });
+    const late = booking("late", "21:00");
+    const groups = groupBookings([late, early, dinner, lunch], time("19:45"));
+    expect(groups.finished).toEqual([lunch]);
+    expect(groups.now).toEqual([dinner, early]);
+    expect(groups.upcoming).toEqual([late]);
+  });
+});
+
+describe("atTime", () => {
+  it("sets the time on the given day", () => {
+    const date = atTime(time("09:00"), "18:45");
+    expect(formatTime(date)).toBe("18:45");
+    expect(date.getDate()).toBe(time("09:00").getDate());
+  });
+});
+
+describe("day helpers", () => {
+  it("finds the start of the day and moves between days", () => {
+    const evening = time("19:30");
+    expect(startOfDay(evening).getHours()).toBe(0);
+    expect(startOfDay(evening).getDate()).toBe(evening.getDate());
+    expect(addDays(evening, 1).getDate()).toBe(14);
+    expect(formatTime(addDays(evening, -1))).toBe("19:30");
+    expect(minutesIntoDay(evening)).toBe(19 * 60 + 30);
   });
 });

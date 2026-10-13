@@ -5,11 +5,55 @@ export const UPCOMING_WINDOW_MIN = 60;
 
 export type TableStatus = "vacant" | "upcoming" | "reserved" | "occupied";
 
+// Bookings start on quarter hours.
+export const SLOT_MIN = 15;
+
 const MINUTE = 60_000;
 
 const startOf = (booking: Booking) => new Date(booking.start).getTime();
 const endOf = (booking: Booking) =>
   startOf(booking) + booking.durationMin * MINUTE;
+
+export const bookingEnd = (booking: Booking) => new Date(endOf(booking));
+
+// Midnight at the start of the given day, local time.
+export function startOfDay(date: Date) {
+  const day = new Date(date);
+  day.setHours(0, 0, 0, 0);
+  return day;
+}
+
+// The same time of day, `days` days later (or earlier).
+export function addDays(date: Date, days: number) {
+  const moved = new Date(date);
+  moved.setDate(moved.getDate() + days);
+  return moved;
+}
+
+// Minutes since midnight.
+export function minutesIntoDay(date: Date) {
+  return date.getHours() * 60 + date.getMinutes();
+}
+
+// The given day at "HH:MM", local time.
+export function atTime(day: Date, time: string) {
+  const [hours, minutes] = time.split(":").map(Number);
+  const date = new Date(day);
+  date.setHours(hours, minutes, 0, 0);
+  return date;
+}
+
+// The first quarter hour at or after the given time.
+export function nextSlot(time: Date) {
+  const slot = new Date(time);
+  slot.setSeconds(0, 0);
+  const minutes = slot.getMinutes();
+  slot.setMinutes(Math.ceil(minutes / SLOT_MIN) * SLOT_MIN);
+  if (slot.getTime() < time.getTime()) {
+    slot.setMinutes(slot.getMinutes() + SLOT_MIN);
+  }
+  return slot;
+}
 
 export function isSameDay(a: Date, b: Date) {
   return (
@@ -92,4 +136,61 @@ export function suggestTables(
         a.seats - b.seats ||
         a.label.localeCompare(b.label, undefined, { numeric: true }),
     );
+}
+
+// The earliest start from `from` onwards where a booking of the given length
+// fits on the table, looking a day ahead. Falls back to `from` rounded up.
+export function nextFreeStart(
+  tableId: string,
+  bookings: Booking[],
+  from: Date,
+  durationMin: number,
+) {
+  const first = nextSlot(from);
+  for (let i = 0; i < (24 * 60) / SLOT_MIN; i++) {
+    const start = new Date(first.getTime() + i * SLOT_MIN * MINUTE);
+    const candidate: Booking = {
+      id: "",
+      tableId,
+      guestName: "",
+      partySize: 1,
+      start: start.toISOString(),
+      durationMin,
+    };
+    if (conflicts(candidate, bookings).length === 0) return start;
+  }
+  return first;
+}
+
+// Where a single booking stands at a given time.
+export type BookingState = "upcoming" | "due" | "seated" | "finished";
+
+export function bookingState(booking: Booking, time: Date): BookingState {
+  const t = time.getTime();
+  if (endOf(booking) <= t) return "finished";
+  if (booking.seatedAt && new Date(booking.seatedAt).getTime() <= t) {
+    return "seated";
+  }
+  return startOf(booking) <= t ? "due" : "upcoming";
+}
+
+export type BookingGroups = {
+  // Seated, or within their booked time.
+  now: Booking[];
+  upcoming: Booking[];
+  finished: Booking[];
+};
+
+// Splits bookings by where they stand at the given time, each group in
+// start order.
+export function groupBookings(bookings: Booking[], time: Date): BookingGroups {
+  const groups: BookingGroups = { now: [], upcoming: [], finished: [] };
+  const sorted = [...bookings].sort((a, b) => startOf(a) - startOf(b));
+  for (const booking of sorted) {
+    const state = bookingState(booking, time);
+    if (state === "finished") groups.finished.push(booking);
+    else if (state === "upcoming") groups.upcoming.push(booking);
+    else groups.now.push(booking);
+  }
+  return groups;
 }

@@ -60,3 +60,19 @@ export function RoundIcon() {
     </Icon>
   );
 }
+
+export function CheckIcon() {
+  return (
+    <Icon>
+      <path d="M20 6 9 17l-5-5" />
+    </Icon>
+  );
+}
+
+export function PlusIcon() {
+  return (
+    <Icon>
+      <path d="M12 5v14M5 12h14" />
+    </Icon>
+  );
+}

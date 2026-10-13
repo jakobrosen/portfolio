@@ -1,5 +1,8 @@
 export type TableShape = "rect" | "round";
 
+// Edit is for arranging the floor plan, booking for running the day.
+export type Mode = "edit" | "booking";
+
 export type Table = {
   id: string;
   label: string;
