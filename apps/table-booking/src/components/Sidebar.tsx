@@ -30,7 +30,7 @@ function Sidebar({
 }: SidebarProps) {
   const { dispatch, canUndo, canRedo } = useAppState();
   return (
-    <aside className="row-span-2 flex min-h-0 flex-col border-r border-border bg-panel">
+    <aside className="row-span-2 flex min-h-0 flex-col border-r border-border bg-panel on-accent">
       <div
         role="tablist"
         className="m-4 mb-0 grid shrink-0 grid-cols-2 overflow-hidden rounded-md border border-border text-sm">

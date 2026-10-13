@@ -57,10 +57,10 @@ function TableNode({
   const { width, height } = table;
   const style = statusStyles[status];
   const chairs = chairPositions(table);
-  // A vacant table shows all chairs as free. A booked one colours a chair per
-  // guest, so it's easy to see how full the table is.
-  const coloured =
-    status === "vacant" ? chairs.length : (booking?.partySize ?? 0);
+  // Vacant is the normal state, so its chairs stay grey and colour is left
+  // for tables that need attention. A booked table colours a chair per
+  // guest, so it's easy to see how full it is.
+  const coloured = status === "vacant" ? 0 : (booking?.partySize ?? 0);
   const round = table.shape === "round";
 
   return (
@@ -106,17 +106,19 @@ function TableNode({
           className={`absolute flex flex-col overflow-hidden p-2 text-xs leading-tight ${round ? "items-center justify-center text-center" : ""}`}
           style={{ left: CHAIR_EXTENT, top: CHAIR_EXTENT, width, height }}>
           <span className="font-medium text-muted">{table.label}</span>
-          {booking && (
-            <span className="mt-auto w-full truncate font-medium">
-              {booking.guestName}
-            </span>
-          )}
-          <span className={`${booking ? "" : "mt-auto"} ${style.text}`}>
-            {style.label}
-            {booking &&
-              status !== "occupied" &&
-              ` ${formatTime(booking.start)}`}
-          </span>
+          {/* The chairs' colour shows the status, the word is for screen
+              readers. Seated tables show the guest, booked ones the time. */}
+          <span className="sr-only">{style.label}</span>
+          {booking &&
+            (status === "occupied" ? (
+              <span className="mt-auto w-full truncate font-medium">
+                {booking.guestName}
+              </span>
+            ) : (
+              <span className={`mt-auto font-medium ${style.text}`}>
+                {formatTime(booking.start)}
+              </span>
+            ))}
         </div>
       )}
     </div>

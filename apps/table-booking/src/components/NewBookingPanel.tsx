@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { formatDate } from "../lib/format";
 import type { Booking } from "../types";
 import BookingForm from "./BookingForm";
@@ -15,8 +16,27 @@ type NewBookingPanelProps = {
 // A booking made from the top bar, where the form suggests a free table.
 // It sits to the side so the suggested tables stay visible on the floor.
 function NewBookingPanel({ time, onDone, onHighlight }: NewBookingPanelProps) {
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Clicking anywhere else closes the panel, like the other popovers. The
+  // top bar button is left out, as it toggles the panel itself.
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Element;
+      if (
+        !panelRef.current?.contains(target) &&
+        !target.closest("[data-new-booking-trigger]")
+      ) {
+        onDone();
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [onDone]);
+
   return (
     <div
+      ref={panelRef}
       role="dialog"
       aria-label="New booking"
       onKeyDown={(event) => {

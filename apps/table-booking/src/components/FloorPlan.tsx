@@ -8,6 +8,7 @@ import type { Booking, Mode, Table } from "../types";
 import TableNode from "./TableNode";
 import ResizeHandles from "./ResizeHandles";
 import TableMenu from "./TableMenu";
+import useFloorPan from "../hooks/useFloorPan";
 
 // Space kept free past the furthest table, so there's room to keep building.
 const PADDING = 200;
@@ -172,6 +173,8 @@ function FloorPlan({
 }: FloorPlanProps) {
   const { state, dispatch } = useAppState();
   const { setNodeRef } = useDroppable({ id: FLOOR_ID });
+  const { floorRef, panning, spaceHeld, onPointerDownCapture } =
+    useFloorPan(mode);
   // The table being resized, shown in place of the saved one until released.
   const [resizing, setResizing] = useState<Table | null>(null);
   const resizeValid = resizing ? !collides(resizing, state.tables) : true;
@@ -204,7 +207,11 @@ function FloorPlan({
 
   return (
     <main
-      ref={setNodeRef}
+      ref={(node) => {
+        setNodeRef(node);
+        floorRef.current = node;
+      }}
+      onPointerDownCapture={onPointerDownCapture}
       onClick={(event) => {
         // Clicking empty floor clears the selection.
         if (
@@ -214,7 +221,9 @@ function FloorPlan({
           onSelect(undefined);
         }
       }}
-      className="relative h-full overflow-auto bg-[radial-gradient(var(--color-grid-dot)_1px,transparent_1px)] bg-size-[20px_20px] bg-local bg-position-[-10px_-10px]">
+      // The grid is only there to line tables up, so bookings go without it.
+      // A hand shows the floor can be dragged, everywhere while space is held.
+      className={`relative h-full overflow-auto select-none ${panning ? "cursor-grabbing **:cursor-grabbing!" : spaceHeld ? "cursor-grab **:cursor-grab!" : "cursor-grab"} ${mode === "edit" ? "bg-[radial-gradient(var(--color-grid-dot)_1px,transparent_1px)] bg-size-[20px_20px] bg-local bg-position-[-10px_-10px]" : ""}`}>
       {tables.length === 0 && (
         <p className="pointer-events-none absolute inset-0 grid place-items-center text-sm text-muted">
           {mode === "edit"

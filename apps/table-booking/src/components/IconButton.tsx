@@ -43,7 +43,7 @@ function IconButton({
       </button>
       <span
         role="tooltip"
-        className={`pointer-events-none absolute bottom-full z-10 mb-1.5 ${tooltipAlign === "start" ? "left-0" : "left-1/2 -translate-x-1/2"} rounded-md bg-foreground px-2 py-1 text-xs whitespace-nowrap text-background opacity-0 transition-opacity delay-0 group-hover:opacity-100 group-hover:delay-700 group-has-focus-visible:opacity-100 group-has-focus-visible:delay-0`}>
+        className={`pointer-events-none absolute bottom-full z-10 mb-1.5 ${tooltipAlign === "start" ? "left-0" : "left-1/2 -translate-x-1/2"} rounded-md bg-tooltip px-2 py-1 text-xs whitespace-nowrap text-tooltip-foreground opacity-0 transition-opacity delay-0 group-hover:opacity-100 group-hover:delay-700 group-has-focus-visible:opacity-100 group-has-focus-visible:delay-0`}>
         {label}
       </span>
     </span>

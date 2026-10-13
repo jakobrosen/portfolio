@@ -1,10 +1,10 @@
 @import "tailwindcss";
 
+/* Not inline, so utilities read the variables and parts of the page can
+   swap them, like the sidebar in .on-accent. */
 @theme {
   --font-sans: "Roboto Variable", ui-sans-serif, system-ui, sans-serif;
-}
 
-@theme inline {
   /* Palette from comminova.se. Surfaces, lightest to darkest. */
   --color-background: #fbfaf9;
   --color-panel: #f7f5f3;
@@ -18,12 +18,30 @@
   --color-accent-subtle: #fdedf2;
   --color-table: #fff;
   --color-chair: #e3ddd8;
+  /* Tooltips stay dark everywhere, also on the accent coloured sidebar. */
+  --color-tooltip: #18161d;
+  --color-tooltip-foreground: #fff;
 
   /* Booking status, used for chairs and labels. */
   --color-vacant: oklch(0.62 0.15 150);
   --color-upcoming: oklch(0.75 0.16 75);
   --color-occupied: #5b57fe;
   --color-conflict: #e93a6b;
+}
+
+/* Light on accent: the same tokens, swapped for an accent background. */
+@utility on-accent {
+  color-scheme: dark;
+  --color-panel: #54132b;
+  --color-background: color-mix(in oklab, #fff 10%, transparent);
+  --color-surface: color-mix(in oklab, #fff 14%, transparent);
+  --color-border: color-mix(in oklab, #fff 18%, transparent);
+  --color-foreground: #fff;
+  --color-muted: color-mix(in oklab, #fff 68%, transparent);
+  --color-accent: #fff;
+  --color-accent-foreground: #54132b;
+  --color-accent-subtle: color-mix(in oklab, #fff 18%, transparent);
+  color: var(--color-foreground);
 }
 
 @layer base {
@@ -35,5 +53,17 @@
 
   body {
     @apply bg-background font-sans text-foreground antialiased selection:bg-accent selection:text-accent-foreground;
+  }
+
+  /* Tailwind v4 leaves buttons with the default arrow. A hand makes it
+     clearer what's clickable, especially on flat icon buttons. */
+  button,
+  [role="button"] {
+    @apply cursor-pointer;
+  }
+
+  button:disabled,
+  [role="button"][aria-disabled="true"] {
+    @apply cursor-default;
   }
 }

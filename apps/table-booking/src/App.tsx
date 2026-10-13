@@ -55,18 +55,19 @@ function App() {
     setSelectedId,
   );
 
+  function closeNewBooking() {
+    setCreating(false);
+    setHoveredId(undefined);
+  }
+
   useShortcuts({
     mode,
     selected: state.tables.find((table) => table.id === selectedId),
     onSelect: setSelectedId,
     onNewBooking: () => setCreating(true),
     onEscape: () => {
-      if (creating) {
-        setCreating(false);
-        setHoveredId(undefined);
-      } else {
-        setSelectedId(undefined);
-      }
+      if (creating) closeNewBooking();
+      else setSelectedId(undefined);
     },
   });
 
@@ -85,7 +86,10 @@ function App() {
           live={viewed === null}
           now={now}
           onTimeChange={setViewed}
-          onNewBooking={() => setCreating(true)}
+          creating={creating}
+          onNewBooking={() =>
+            creating ? closeNewBooking() : setCreating(true)
+          }
         />
         <div className="relative min-h-0 min-w-0">
           <FloorPlan
@@ -103,8 +107,7 @@ function App() {
               time={time}
               onHighlight={setHoveredId}
               onDone={(saved) => {
-                setCreating(false);
-                setHoveredId(undefined);
+                closeNewBooking();
                 // Show the new booking on its table.
                 if (saved) {
                   setMode("booking");

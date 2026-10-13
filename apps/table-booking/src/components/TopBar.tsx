@@ -4,10 +4,9 @@ import {
   isSameDay,
   minutesIntoDay,
   occupancy,
-  SLOT_MIN,
   startOfDay,
 } from "../lib/bookings";
-import { formatDate, formatTime } from "../lib/format";
+import DatePicker from "./DatePicker";
 import { PlusIcon } from "./icons";
 
 type TopBarProps = {
@@ -18,10 +17,10 @@ type TopBarProps = {
   now: Date;
   // A fixed moment to look at, or null to follow the clock again.
   onTimeChange: (time: Date | null) => void;
+  // Whether the new booking panel is open, the button toggles it.
+  creating: boolean;
   onNewBooking: () => void;
 };
-
-const LAST_SLOT = 24 * 60 - SLOT_MIN;
 
 const stepClass =
   "grid size-8 place-items-center rounded-md text-lg text-muted hover:bg-surface hover:text-foreground";
@@ -36,55 +35,50 @@ function Stat({ value, label }: { value: string; label: string }) {
   );
 }
 
-function TopBar({ time, live, now, onTimeChange, onNewBooking }: TopBarProps) {
+function TopBar({
+  time,
+  live,
+  now,
+  onTimeChange,
+  creating,
+  onNewBooking,
+}: TopBarProps) {
   const { state } = useAppState();
   const stats = occupancy(state.tables, state.bookings, time);
-  const today = isSameDay(time, now);
-  const minutes = minutesIntoDay(time);
+
+  // Other days are shown at the current time of day, and coming back to
+  // today follows the clock again.
+  function pickDay(day: Date) {
+    if (isSameDay(day, now)) {
+      onTimeChange(null);
+      return;
+    }
+    const picked = startOfDay(day);
+    picked.setMinutes(minutesIntoDay(time));
+    onTimeChange(picked);
+  }
 
   return (
-    <header className="flex items-center gap-6 border-b border-border bg-panel px-6 py-3">
+    <header className="flex items-center gap-6 border-b border-border bg-panel px-6 py-3 on-accent">
       <h1 className="font-medium">Table Booking</h1>
 
       <div className="flex items-center gap-1" aria-label="Day">
         <button
           type="button"
           aria-label="Previous day"
-          onClick={() => onTimeChange(addDays(time, -1))}
+          onClick={() => pickDay(addDays(time, -1))}
           className={stepClass}>
           ‹
         </button>
-        <span className="min-w-24 text-center text-sm font-medium">
-          {formatDate(time)}
-        </span>
+        <DatePicker value={time} today={now} onChange={pickDay} />
         <button
           type="button"
           aria-label="Next day"
-          onClick={() => onTimeChange(addDays(time, 1))}
+          onClick={() => pickDay(addDays(time, 1))}
           className={stepClass}>
           ›
         </button>
       </div>
-
-      <label className="flex min-w-0 flex-1 items-center gap-3 text-sm">
-        <span className="sr-only">Time</span>
-        <input
-          type="range"
-          min={0}
-          max={LAST_SLOT}
-          step={SLOT_MIN}
-          value={Math.min(minutes - (minutes % SLOT_MIN), LAST_SLOT)}
-          onChange={(event) => {
-            const day = startOfDay(time);
-            day.setMinutes(Number(event.target.value));
-            onTimeChange(day);
-          }}
-          className="max-w-md min-w-0 flex-1 accent-accent"
-        />
-        <span className="w-11 font-medium tabular-nums">
-          {formatTime(time)}
-        </span>
-      </label>
 
       {live ? (
         <span className="flex items-center gap-1.5 text-sm text-muted">
@@ -96,7 +90,7 @@ function TopBar({ time, live, now, onTimeChange, onNewBooking }: TopBarProps) {
           type="button"
           onClick={() => onTimeChange(null)}
           className="rounded-md border border-border bg-background px-3 py-1.5 text-sm hover:border-accent/40">
-          {today ? "Back to now" : "Today"}
+          Today
         </button>
       )}
 
@@ -121,6 +115,9 @@ function TopBar({ time, live, now, onTimeChange, onNewBooking }: TopBarProps) {
 
       <button
         type="button"
+        aria-expanded={creating}
+        // The panel leaves clicks on its own button to the button itself.
+        data-new-booking-trigger
         onClick={onNewBooking}
         className="ml-auto flex shrink-0 items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-foreground xl:ml-0">
         <PlusIcon />
