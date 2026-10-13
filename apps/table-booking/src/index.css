@@ -16,6 +16,8 @@
   --color-accent: #54132b;
   --color-accent-foreground: #fff;
   --color-accent-subtle: #fdedf2;
+  --color-table: #fff;
+  --color-chair: #e3ddd8;
 
   /* Booking status, used for chairs and labels. */
   --color-vacant: oklch(0.62 0.15 150);
