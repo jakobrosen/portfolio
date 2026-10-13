@@ -2,5 +2,13 @@
   "bracketSameLine": true,
   "htmlWhitespaceSensitivity": "ignore",
   "plugins": ["prettier-plugin-tailwindcss"],
-  "tailwindStylesheet": "./src/index.css"
+  "tailwindStylesheet": "./src/index.css",
+  "overrides": [
+    {
+      "files": "apps/table-booking/**",
+      "options": {
+        "tailwindStylesheet": "./apps/table-booking/src/index.css"
+      }
+    }
+  ]
 }

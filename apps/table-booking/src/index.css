@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Roboto Variable", ui-sans-serif, system-ui, sans-serif;
+}
+
+@theme inline {
+  /* Palette from comminova.se. Surfaces, lightest to darkest. */
+  --color-background: #fbfaf9;
+  --color-panel: #f7f5f3;
+  --color-surface: #f1edea;
+  --color-border: color-mix(in oklab, #18161d 10%, transparent);
+  --color-grid-dot: color-mix(in oklab, #18161d 22%, transparent);
+  --color-foreground: #18161d;
+  --color-muted: color-mix(in oklab, #18161d 60%, transparent);
+  --color-accent: #54132b;
+  --color-accent-foreground: #fff;
+  --color-accent-subtle: #fdedf2;
+
+  /* Booking status, used for chairs and labels. */
+  --color-vacant: oklch(0.62 0.15 150);
+  --color-upcoming: oklch(0.75 0.16 75);
+  --color-occupied: #5b57fe;
+  --color-conflict: #e93a6b;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    @apply h-full;
+  }
+
+  body {
+    @apply bg-background font-sans text-foreground antialiased selection:bg-accent selection:text-accent-foreground;
+  }
+}

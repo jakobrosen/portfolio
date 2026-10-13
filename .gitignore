@@ -23,3 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 .wrangler
+PLAN.md
+TABLE_BOOKING_PLAN.md
+reference-images
