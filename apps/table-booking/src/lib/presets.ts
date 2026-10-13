@@ -1,3 +1,4 @@
+import { findFreeSpot } from "./geometry";
 import type { Table, TableShape } from "../types";
 
 export type Preset = {
@@ -26,4 +27,12 @@ export function nextLabel(tables: Table[]) {
     Number(/^T(\d+)$/.exec(table.label)?.[1] ?? 0),
   );
   return `T${Math.max(0, ...numbers) + 1}`;
+}
+
+// A copy of the table with a new id and label, at the nearest free spot.
+// Null when there's no room for one.
+export function copyOf(table: Table, tables: Table[]): Table | null {
+  const spot = findFreeSpot(table, tables);
+  if (!spot) return null;
+  return { ...spot, id: crypto.randomUUID(), label: nextLabel(tables) };
 }

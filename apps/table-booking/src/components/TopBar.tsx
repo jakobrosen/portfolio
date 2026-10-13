@@ -1,7 +1,9 @@
+import useAppState from "../state/useAppState";
 import {
   addDays,
   isSameDay,
   minutesIntoDay,
+  occupancy,
   SLOT_MIN,
   startOfDay,
 } from "../lib/bookings";
@@ -24,7 +26,19 @@ const LAST_SLOT = 24 * 60 - SLOT_MIN;
 const stepClass =
   "grid size-8 place-items-center rounded-md text-lg text-muted hover:bg-surface hover:text-foreground";
 
+// A number with a label under it, like "6/12" over "seated".
+function Stat({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="flex flex-col leading-tight">
+      <span className="text-sm font-medium tabular-nums">{value}</span>
+      <span className="text-xs text-muted">{label}</span>
+    </div>
+  );
+}
+
 function TopBar({ time, live, now, onTimeChange, onNewBooking }: TopBarProps) {
+  const { state } = useAppState();
+  const stats = occupancy(state.tables, state.bookings, time);
   const today = isSameDay(time, now);
   const minutes = minutesIntoDay(time);
 
@@ -86,10 +100,29 @@ function TopBar({ time, live, now, onTimeChange, onNewBooking }: TopBarProps) {
         </button>
       )}
 
+      <div
+        aria-label="Occupancy"
+        className="ml-auto hidden items-center gap-5 border-l border-border pl-6 xl:flex">
+        <Stat value={`${stats.seated}/${stats.tables}`} label="tables seated" />
+        <Stat value={String(stats.expected)} label="expected" />
+        <Stat value={String(stats.guests)} label="guests" />
+        <div className="flex flex-col gap-1 leading-tight">
+          <span className="text-sm font-medium tabular-nums">
+            {stats.percent}% full
+          </span>
+          <span className="h-1.5 w-20 overflow-hidden rounded-full bg-surface">
+            <span
+              className="block h-full rounded-full bg-occupied"
+              style={{ width: `${stats.percent}%` }}
+            />
+          </span>
+        </div>
+      </div>
+
       <button
         type="button"
         onClick={onNewBooking}
-        className="ml-auto flex shrink-0 items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-foreground">
+        className="ml-auto flex shrink-0 items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-foreground xl:ml-0">
         <PlusIcon />
         New booking
       </button>

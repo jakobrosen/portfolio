@@ -1,12 +1,15 @@
 import { useEffect, useReducer, type ReactNode } from "react";
 import { AppStateContext } from "./AppStateContext";
-import { reducer } from "./reducer";
+import { historyReducer, startHistory } from "./history";
 import { loadState, saveState } from "./storage";
 
 const SAVE_DELAY_MS = 300;
 
 function AppStateProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, undefined, loadState);
+  const [history, dispatch] = useReducer(historyReducer, undefined, () =>
+    startHistory(loadState()),
+  );
+  const state = history.present;
 
   // Debounced so resizing a table doesn't write on every pointer move. Leaving
   // the page saves right away, so a quick reload doesn't lose the last change.
@@ -22,7 +25,13 @@ function AppStateProvider({ children }: { children: ReactNode }) {
   }, [state]);
 
   return (
-    <AppStateContext.Provider value={{ state, dispatch }}>
+    <AppStateContext.Provider
+      value={{
+        state,
+        dispatch,
+        canUndo: history.past.length > 0,
+        canRedo: history.future.length > 0,
+      }}>
       {children}
     </AppStateContext.Provider>
   );

@@ -9,6 +9,7 @@ import NewBookingPanel from "./components/NewBookingPanel";
 import useAppState from "./state/useAppState";
 import useFloorDnd from "./hooks/useFloorDnd";
 import useNow from "./hooks/useNow";
+import useShortcuts from "./hooks/useShortcuts";
 import { statusAt } from "./lib/bookings";
 import { presetTable } from "./lib/presets";
 import type { Mode } from "./types";
@@ -53,6 +54,21 @@ function App() {
     contentRef,
     setSelectedId,
   );
+
+  useShortcuts({
+    mode,
+    selected: state.tables.find((table) => table.id === selectedId),
+    onSelect: setSelectedId,
+    onNewBooking: () => setCreating(true),
+    onEscape: () => {
+      if (creating) {
+        setCreating(false);
+        setHoveredId(undefined);
+      } else {
+        setSelectedId(undefined);
+      }
+    },
+  });
 
   return (
     <DndContext {...contextProps}>

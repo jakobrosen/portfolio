@@ -151,6 +151,8 @@ function TableMenu({ table, time, mode, onSelect }: TableMenuProps) {
                 type: "updateTable",
                 id: table.id,
                 changes: { label: event.target.value },
+                // One undo step for the whole edit.
+                coalesce: `label:${table.id}`,
               })
             }
             onBlur={() => {

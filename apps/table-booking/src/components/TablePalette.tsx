@@ -62,6 +62,10 @@ function TablePalette() {
       <p className="text-sm text-muted">
         Drag a table onto the floor plan, then resize it to fit.
       </p>
+      <p className="text-xs leading-relaxed text-muted">
+        With a table selected, arrow keys move it (hold Shift for bigger steps),
+        D duplicates it and Delete removes it.
+      </p>
       <ul className="grid grid-cols-2 gap-2">
         {presets.map((preset) => (
           <PresetTile key={preset.key} preset={preset} />

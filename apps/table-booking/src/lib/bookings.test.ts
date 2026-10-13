@@ -9,6 +9,7 @@ import {
   minutesIntoDay,
   nextFreeStart,
   nextSlot,
+  occupancy,
   startOfDay,
   statusAt,
   suggestTables,
@@ -176,5 +177,25 @@ describe("day helpers", () => {
     expect(addDays(evening, 1).getDate()).toBe(14);
     expect(formatTime(addDays(evening, -1))).toBe("19:30");
     expect(minutesIntoDay(evening)).toBe(19 * 60 + 30);
+  });
+});
+
+describe("occupancy", () => {
+  it("counts seated and expected tables and how full it is", () => {
+    const tables = [table("t1", 4), table("t2", 4), table("t3", 2)];
+    const bookings = [
+      booking("seated", "18:00", 120, {
+        seatedAt: time("18:05").toISOString(),
+      }),
+      booking("soon", "19:30", 90, { tableId: "t2", partySize: 4 }),
+    ];
+    expect(occupancy(tables, bookings, time("19:00"))).toEqual({
+      tables: 3,
+      seated: 1,
+      expected: 1,
+      guests: 2,
+      seats: 10,
+      percent: 20,
+    });
   });
 });

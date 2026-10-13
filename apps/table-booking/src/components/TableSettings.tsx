@@ -3,13 +3,12 @@ import useAppState from "../state/useAppState";
 import {
   clamp,
   collides,
-  findFreeSpot,
   maxSeats,
   MAX_TABLE_SIZE,
   MIN_TABLE_SIZE,
   snap,
 } from "../lib/geometry";
-import { nextLabel } from "../lib/presets";
+import { copyOf } from "../lib/presets";
 import type { Table, TableShape } from "../types";
 import IconButton from "./IconButton";
 import { DeleteIcon, DuplicateIcon, RectIcon, RoundIcon } from "./icons";
@@ -64,13 +63,8 @@ function TableSettings({ table, onSelect }: TableSettingsProps) {
   }
 
   function duplicate() {
-    const spot = findFreeSpot(table, state.tables);
-    if (!spot) return;
-    const copy = {
-      ...spot,
-      id: crypto.randomUUID(),
-      label: nextLabel(state.tables),
-    };
+    const copy = copyOf(table, state.tables);
+    if (!copy) return;
     dispatch({ type: "addTable", table: copy });
     onSelect(copy.id);
   }
@@ -149,7 +143,15 @@ function TableSettings({ table, onSelect }: TableSettingsProps) {
           min={1}
           max={max}
           value={table.seats}
-          onChange={(event) => update({ seats: Number(event.target.value) })}
+          onChange={(event) =>
+            dispatch({
+              type: "updateTable",
+              id: table.id,
+              changes: { seats: Number(event.target.value) },
+              // One undo step for the whole drag.
+              coalesce: `seats:${table.id}`,
+            })
+          }
           className="min-w-0 flex-1 accent-accent"
         />
         <span className="text-muted tabular-nums">

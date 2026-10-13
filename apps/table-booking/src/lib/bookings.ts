@@ -194,3 +194,44 @@ export function groupBookings(bookings: Booking[], time: Date): BookingGroups {
   }
   return groups;
 }
+
+export type Occupancy = {
+  tables: number;
+  // Tables with guests seated.
+  seated: number;
+  // Tables booked within the upcoming window, or waiting for late guests.
+  expected: number;
+  guests: number;
+  seats: number;
+  // Seated guests as a share of all chairs, 0–100.
+  percent: number;
+};
+
+// How full the restaurant is at a given time.
+export function occupancy(
+  tables: Table[],
+  bookings: Booking[],
+  time: Date,
+): Occupancy {
+  let seated = 0;
+  let expected = 0;
+  let guests = 0;
+  for (const table of tables) {
+    const { status, booking } = statusAt(table.id, bookings, time);
+    if (status === "occupied") {
+      seated++;
+      guests += booking?.partySize ?? 0;
+    } else if (status !== "vacant") {
+      expected++;
+    }
+  }
+  const seats = tables.reduce((sum, table) => sum + table.seats, 0);
+  return {
+    tables: tables.length,
+    seated,
+    expected,
+    guests,
+    seats,
+    percent: seats ? Math.round((guests / seats) * 100) : 0,
+  };
+}
