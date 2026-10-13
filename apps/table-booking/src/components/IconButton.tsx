@@ -5,6 +5,8 @@ type IconButtonProps = {
   label: string;
   onClick: () => void;
   tone?: "default" | "danger";
+  // For toggles, whether this one is on.
+  pressed?: boolean;
   children: ReactNode;
 };
 
@@ -14,6 +16,7 @@ function IconButton({
   label,
   onClick,
   tone = "default",
+  pressed,
   children,
 }: IconButtonProps) {
   return (
@@ -21,13 +24,20 @@ function IconButton({
       <button
         type="button"
         aria-label={label}
+        aria-pressed={pressed}
         onClick={onClick}
-        className={`grid size-8 place-items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-accent ${tone === "danger" ? "text-conflict hover:bg-conflict/10" : "text-muted hover:bg-surface hover:text-foreground"}`}>
+        className={`grid size-8 place-items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+          pressed
+            ? "bg-accent-subtle text-accent"
+            : tone === "danger"
+              ? "text-conflict hover:bg-conflict/10"
+              : "text-muted hover:bg-surface hover:text-foreground"
+        }`}>
         {children}
       </button>
       <span
         role="tooltip"
-        className="pointer-events-none absolute top-full left-1/2 z-10 mt-1.5 -translate-x-1/2 rounded-md bg-foreground px-2 py-1 text-xs whitespace-nowrap text-background opacity-0 transition-opacity delay-0 group-hover:opacity-100 group-hover:delay-700 group-has-focus-visible:opacity-100 group-has-focus-visible:delay-0">
+        className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 rounded-md bg-foreground px-2 py-1 text-xs whitespace-nowrap text-background opacity-0 transition-opacity delay-0 group-hover:opacity-100 group-hover:delay-700 group-has-focus-visible:opacity-100 group-has-focus-visible:delay-0">
         {label}
       </span>
     </span>

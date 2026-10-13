@@ -44,3 +44,19 @@ export function CloseIcon() {
     </Icon>
   );
 }
+
+export function RectIcon() {
+  return (
+    <Icon>
+      <rect x="3" y="6" width="18" height="12" rx="2" />
+    </Icon>
+  );
+}
+
+export function RoundIcon() {
+  return (
+    <Icon>
+      <circle cx="12" cy="12" r="8" />
+    </Icon>
+  );
+}

@@ -1,19 +1,27 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import useAppState from "../state/useAppState";
 import {
-  CHAIR_EXTENT,
   clamp,
   collides,
   findFreeSpot,
   maxSeats,
   MAX_TABLE_SIZE,
+  MENU_ARROW_INSET,
   MIN_TABLE_SIZE,
+  placeMenu,
   snap,
+  type MenuSide,
 } from "../lib/geometry";
 import { nextLabel } from "../lib/presets";
 import type { Table, TableShape } from "../types";
 import IconButton from "./IconButton";
-import { CloseIcon, DeleteIcon, DuplicateIcon } from "./icons";
+import {
+  CloseIcon,
+  DeleteIcon,
+  DuplicateIcon,
+  RectIcon,
+  RoundIcon,
+} from "./icons";
 
 type TableMenuProps = {
   table: Table;
@@ -21,16 +29,21 @@ type TableMenuProps = {
 };
 
 const MENU_WIDTH = 288;
-// Gap between the menu and the table's chairs.
-const GAP = 12;
-// Rough height of the menu. Tables closer than this to the top of the floor
-// plan get their menu below instead of above.
-const MENU_HEIGHT = 200;
+// Height of the menu with its controls, used to pick a side with room.
+const MENU_HEIGHT = 136;
 
-const shapes: { shape: TableShape; label: string }[] = [
-  { shape: "rect", label: "Rectangular" },
-  { shape: "round", label: "Round" },
-];
+// The arrow sits on the edge facing the table.
+const arrowStyles: Record<MenuSide, string> = {
+  right: "-left-1.5 border-b border-l",
+  left: "-right-1.5 border-t border-r",
+  below: "-top-1.5 border-t border-l",
+  above: "-bottom-1.5 border-r border-b",
+};
+
+const shapes = [
+  { shape: "rect", label: "Rectangle", icon: <RectIcon /> },
+  { shape: "round", label: "Round", icon: <RoundIcon /> },
+] satisfies { shape: TableShape; label: string; icon: ReactNode }[];
 
 // Round tables need equal sides, so a rectangle becomes a circle of about
 // the same size. A circle becomes a square.
@@ -59,9 +72,23 @@ function TableMenu({ table, onSelect }: TableMenuProps) {
     (booking) => booking.tableId === table.id,
   ).length;
 
-  const below = table.y - CHAIR_EXTENT < MENU_HEIGHT + GAP;
-  const centerX = table.x + table.width / 2;
-  const left = Math.max(8, centerX - MENU_WIDTH / 2);
+  const { side, x, y } = placeMenu(table, state.tables, {
+    width: MENU_WIDTH,
+    height: MENU_HEIGHT,
+  });
+  const sideways = side === "left" || side === "right";
+  // Where the arrow meets the edge, lined up with the table's centre.
+  const arrowOffset = sideways
+    ? clamp(
+        table.y + table.height / 2 - y,
+        MENU_ARROW_INSET,
+        MENU_HEIGHT - MENU_ARROW_INSET,
+      ) - 6
+    : clamp(
+        table.x + table.width / 2 - x,
+        MENU_ARROW_INSET,
+        MENU_WIDTH - MENU_ARROW_INSET,
+      ) - 6;
 
   const update = (changes: Partial<Omit<Table, "id">>) =>
     dispatch({ type: "updateTable", id: table.id, changes });
@@ -102,19 +129,19 @@ function TableMenu({ table, onSelect }: TableMenuProps) {
       onKeyDown={(event) => {
         if (event.key === "Escape") close();
       }}
-      className={`absolute z-30 flex flex-col gap-3 rounded-xl border border-border bg-panel p-3 shadow-lg ${below ? "" : "-translate-y-full"}`}
+      // Menus above the table hang from their bottom edge, so they stay next
+      // to the table when the delete confirmation makes them shorter.
+      className={`absolute z-30 flex flex-col gap-3 rounded-xl border border-border bg-panel p-3 shadow-lg ${side === "above" ? "-translate-y-full" : ""}`}
       style={{
-        left,
+        left: x,
+        top: side === "above" ? y + MENU_HEIGHT : y,
         width: MENU_WIDTH,
-        top: below
-          ? table.y + table.height + CHAIR_EXTENT + GAP
-          : table.y - CHAIR_EXTENT - GAP,
       }}>
       {/* Arrow pointing at the table. */}
       <span
         aria-hidden
-        className={`absolute size-3 rotate-45 border-border bg-panel ${below ? "-top-1.5 border-t border-l" : "-bottom-1.5 border-r border-b"}`}
-        style={{ left: centerX - left - 6 }}
+        className={`absolute size-3 rotate-45 border-border bg-panel ${arrowStyles[side]}`}
+        style={sideways ? { top: arrowOffset } : { left: arrowOffset }}
       />
 
       {confirmingDelete ? (
@@ -152,8 +179,34 @@ function TableMenu({ table, onSelect }: TableMenuProps) {
               onBlur={() => {
                 if (!table.label.trim()) update({ label: savedLabel });
               }}
-              className="mr-1 min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1 font-medium outline-none hover:border-border focus:border-accent focus:bg-background"
+              className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1 font-medium outline-none hover:border-border focus:border-accent focus:bg-background"
             />
+            <IconButton label="Close" onClick={close}>
+              <CloseIcon />
+            </IconButton>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <div
+              role="group"
+              aria-label="Shape"
+              className="mr-auto flex rounded-lg border border-border bg-background p-0.5">
+              {shapes.map(({ shape, label, icon }) => (
+                <button
+                  key={shape}
+                  type="button"
+                  aria-pressed={table.shape === shape}
+                  onClick={() => changeShape(shape)}
+                  className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-xs outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                    table.shape === shape
+                      ? "bg-accent-subtle text-accent"
+                      : "text-muted hover:text-foreground"
+                  }`}>
+                  {icon}
+                  {label}
+                </button>
+              ))}
+            </div>
             <IconButton label="Duplicate table" onClick={duplicate}>
               <DuplicateIcon />
             </IconButton>
@@ -163,40 +216,10 @@ function TableMenu({ table, onSelect }: TableMenuProps) {
               onClick={() => setConfirmingDelete(true)}>
               <DeleteIcon />
             </IconButton>
-            <IconButton label="Close" onClick={close}>
-              <CloseIcon />
-            </IconButton>
           </div>
 
-          <div className="grid grid-cols-2 overflow-hidden rounded-md border border-border text-sm">
-            {shapes.map(({ shape, label }) => (
-              <button
-                key={shape}
-                type="button"
-                aria-pressed={table.shape === shape}
-                onClick={() => changeShape(shape)}
-                className={
-                  table.shape === shape
-                    ? "bg-accent-subtle py-1.5 text-accent"
-                    : "bg-background py-1.5 text-muted hover:text-foreground"
-                }>
-                {label}
-              </button>
-            ))}
-          </div>
-          {shapeError && (
-            <p role="alert" className="-mt-1 text-xs text-conflict">
-              {shapeError}
-            </p>
-          )}
-
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="flex justify-between">
-              <span>Chairs</span>
-              <span className="text-muted tabular-nums">
-                {table.seats} of {max}
-              </span>
-            </span>
+          <label className="flex items-center gap-3 px-2 text-sm">
+            <span>Chairs</span>
             <input
               type="range"
               min={1}
@@ -205,9 +228,17 @@ function TableMenu({ table, onSelect }: TableMenuProps) {
               onChange={(event) =>
                 update({ seats: Number(event.target.value) })
               }
-              className="accent-accent"
+              className="min-w-0 flex-1 accent-accent"
             />
+            <span className="text-muted tabular-nums">
+              {table.seats}/{max}
+            </span>
           </label>
+          {shapeError && (
+            <p role="alert" className="-mt-1 px-2 text-xs text-conflict">
+              {shapeError}
+            </p>
+          )}
         </>
       )}
     </div>
