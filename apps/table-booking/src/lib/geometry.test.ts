@@ -3,10 +3,15 @@ import { createDemoState } from "../state/demo";
 import type { Table } from "../types";
 import {
   CHAIR_EXTENT,
+  FLOOR_MARGIN,
+  MAX_TABLE_SIZE,
+  MIN_TABLE_SIZE,
   chairPositions,
   collides,
+  findFreeSpot,
   maxSeats,
   overlaps,
+  resize,
   snap,
 } from "./geometry";
 
@@ -108,5 +113,73 @@ describe("overlaps", () => {
   it("finds no collisions in the demo layout", () => {
     const { tables } = createDemoState();
     expect(tables.filter((table) => collides(table, tables))).toEqual([]);
+  });
+});
+
+describe("resize", () => {
+  const table: Table = { ...rect(120, 80), x: 100, y: 100 };
+
+  it("moves only the dragged edges, snapped to the grid", () => {
+    expect(resize(table, { x: 1, y: 0 }, 47, 30)).toMatchObject({
+      x: 100,
+      width: 160,
+      height: 80,
+    });
+    expect(resize(table, { x: -1, y: -1 }, -38, -21)).toMatchObject({
+      x: 60,
+      y: 80,
+      width: 160,
+      height: 100,
+    });
+  });
+
+  it("keeps sizes within the limits and the floor margin", () => {
+    expect(resize(table, { x: 1, y: 0 }, -500, 0).width).toBe(MIN_TABLE_SIZE);
+    expect(resize(table, { x: 1, y: 0 }, 900, 0).width).toBe(MAX_TABLE_SIZE);
+    expect(resize(table, { x: -1, y: 0 }, -300, 0)).toMatchObject({
+      x: FLOOR_MARGIN,
+      width: 180,
+    });
+  });
+
+  it("keeps round tables round, anchored at the opposite corner", () => {
+    const circle = { ...round(100), x: 200, y: 200 };
+    expect(resize(circle, { x: -1, y: -1 }, -40, -10)).toMatchObject({
+      x: 160,
+      y: 160,
+      width: 140,
+      height: 140,
+    });
+  });
+
+  it("drops chairs that no longer fit", () => {
+    expect(resize(rect(240, 80, 8), { x: 1, y: 0 }, -160, 0).seats).toBe(4);
+  });
+
+  it("adds chairs to a full table as it grows, but not to others", () => {
+    expect(resize(rect(120, 80, 6), { x: 1, y: 0 }, 60, 0).seats).toBe(8);
+    expect(resize(rect(120, 80, 4), { x: 1, y: 0 }, 60, 0).seats).toBe(4);
+  });
+});
+
+describe("findFreeSpot", () => {
+  const original: Table = { ...rect(120, 80), id: "a", x: 100, y: 100 };
+
+  it("finds the nearest spot that clears the original", () => {
+    const spot = findFreeSpot({ ...original, id: "copy" }, [original])!;
+    expect(collides(spot, [original])).toBe(false);
+    // Moving straight down is the shortest way out for a wide table.
+    expect(spot).toMatchObject({ x: 100, y: 240 });
+  });
+
+  it("doesn't overlap the original when given the original itself", () => {
+    const spot = findFreeSpot(original, [original])!;
+    expect(overlaps(spot, original)).toBe(false);
+  });
+
+  it("works around other tables", () => {
+    const below: Table = { ...original, id: "b", y: 240 };
+    const spot = findFreeSpot({ ...original, id: "copy" }, [original, below])!;
+    expect(collides(spot, [original, below])).toBe(false);
   });
 });

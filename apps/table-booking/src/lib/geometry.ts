@@ -4,6 +4,9 @@ import type { Table } from "../types";
 export const GRID = 20;
 export const MIN_TABLE_SIZE = 80;
 export const MAX_TABLE_SIZE = 400;
+// Closest a table may sit to the floor plan's top and left edges, leaving
+// room for its chairs.
+export const FLOOR_MARGIN = 40;
 
 // Space each chair needs along a table edge.
 export const SEAT_PITCH = 60;
@@ -127,5 +130,81 @@ export function overlaps(a: Table, b: Table) {
 export function collides(table: Table, tables: Table[]) {
   return tables.some(
     (other) => other.id !== table.id && overlaps(table, other),
+  );
+}
+
+// Which edges a resize handle moves: -1 for left/top, 1 for right/bottom.
+export type ResizeDirection = { x: -1 | 0 | 1; y: -1 | 0 | 1 };
+
+// The table resized by dragging a handle (dx, dy). The opposite edges stay
+// put, sizes snap to the grid and round tables stay round. A table that had
+// every chair it could fit keeps filling up as it grows.
+export function resize(
+  table: Table,
+  direction: ResizeDirection,
+  dx: number,
+  dy: number,
+): Table {
+  const right = table.x + table.width;
+  const bottom = table.y + table.height;
+  // Growing left or up stops at the floor plan's margin.
+  const maxWidth = Math.min(
+    MAX_TABLE_SIZE,
+    direction.x < 0 ? right - FLOOR_MARGIN : MAX_TABLE_SIZE,
+  );
+  const maxHeight = Math.min(
+    MAX_TABLE_SIZE,
+    direction.y < 0 ? bottom - FLOOR_MARGIN : MAX_TABLE_SIZE,
+  );
+  const fit = (size: number, max: number) =>
+    clamp(snap(size), MIN_TABLE_SIZE, max);
+
+  let { width, height } = table;
+  if (table.shape === "round") {
+    const change =
+      Math.abs(dx) > Math.abs(dy) ? dx * direction.x : dy * direction.y;
+    width = height = fit(table.width + change, Math.min(maxWidth, maxHeight));
+  } else {
+    if (direction.x) width = fit(table.width + dx * direction.x, maxWidth);
+    if (direction.y) height = fit(table.height + dy * direction.y, maxHeight);
+  }
+
+  const resized = {
+    ...table,
+    x: direction.x < 0 ? right - width : table.x,
+    y: direction.y < 0 ? bottom - height : table.y,
+    width,
+    height,
+  };
+  const wasFull = table.seats >= maxSeats(table);
+  const fits = maxSeats(resized);
+  return { ...resized, seats: wasFull ? fits : Math.min(table.seats, fits) };
+}
+
+// How far from the original spot to look for room, in grid steps.
+const SEARCH_RADIUS = 40;
+
+// The free spot closest to where the table is now, other than that spot
+// itself. Used to place a copy of a table next to the original.
+export function findFreeSpot(table: Table, tables: Table[]) {
+  const candidates: Table[] = [];
+  for (let dy = -SEARCH_RADIUS; dy <= SEARCH_RADIUS; dy++) {
+    for (let dx = -SEARCH_RADIUS; dx <= SEARCH_RADIUS; dx++) {
+      const x = table.x + dx * GRID;
+      const y = table.y + dy * GRID;
+      if ((dx || dy) && x >= FLOOR_MARGIN && y >= FLOOR_MARGIN) {
+        candidates.push({ ...table, x, y });
+      }
+    }
+  }
+
+  const distance = (spot: Table) =>
+    Math.hypot(spot.x - table.x, spot.y - table.y);
+  candidates.sort((a, b) => distance(a) - distance(b));
+  // Checked against every table, the original included, since the copy
+  // still has the original's id at this point.
+  return (
+    candidates.find((spot) => !tables.some((other) => overlaps(spot, other))) ??
+    null
   );
 }

@@ -14,6 +14,8 @@ type TableNodeProps = {
   table: Table;
   status: TableStatus;
   booking?: Booking;
+  // Off for previews, which only show the shape and chairs.
+  showDetails?: boolean;
 };
 
 const BACKREST = 3;
@@ -44,7 +46,14 @@ function ChairShape({ chair, className }: { chair: Chair; className: string }) {
   );
 }
 
-function TableNode({ table, status, booking }: TableNodeProps) {
+// The table with its chairs. The box includes room for the chairs, so the
+// table's own top-left corner sits CHAIR_EXTENT in from the box's corner.
+function TableNode({
+  table,
+  status,
+  booking,
+  showDetails = true,
+}: TableNodeProps) {
   const { width, height } = table;
   const style = statusStyles[status];
   const chairs = chairPositions(table);
@@ -56,10 +65,8 @@ function TableNode({ table, status, booking }: TableNodeProps) {
 
   return (
     <div
-      className="absolute"
+      className="relative"
       style={{
-        left: table.x - CHAIR_EXTENT,
-        top: table.y - CHAIR_EXTENT,
         width: width + CHAIR_EXTENT * 2,
         height: height + CHAIR_EXTENT * 2,
       }}>
@@ -94,20 +101,24 @@ function TableNode({ table, status, booking }: TableNodeProps) {
         )}
       </svg>
 
-      <div
-        className={`absolute flex flex-col overflow-hidden p-2 text-xs leading-tight ${round ? "items-center justify-center text-center" : ""}`}
-        style={{ left: CHAIR_EXTENT, top: CHAIR_EXTENT, width, height }}>
-        <span className="font-medium text-muted">{table.label}</span>
-        {booking && (
-          <span className="mt-auto w-full truncate font-medium">
-            {booking.guestName}
+      {showDetails && (
+        <div
+          className={`absolute flex flex-col overflow-hidden p-2 text-xs leading-tight ${round ? "items-center justify-center text-center" : ""}`}
+          style={{ left: CHAIR_EXTENT, top: CHAIR_EXTENT, width, height }}>
+          <span className="font-medium text-muted">{table.label}</span>
+          {booking && (
+            <span className="mt-auto w-full truncate font-medium">
+              {booking.guestName}
+            </span>
+          )}
+          <span className={`${booking ? "" : "mt-auto"} ${style.text}`}>
+            {style.label}
+            {booking &&
+              status !== "occupied" &&
+              ` ${formatTime(booking.start)}`}
           </span>
-        )}
-        <span className={`${booking ? "" : "mt-auto"} ${style.text}`}>
-          {style.label}
-          {booking && status !== "occupied" && ` ${formatTime(booking.start)}`}
-        </span>
-      </div>
+        </div>
+      )}
     </div>
   );
 }
